@@ -1,2 +1,0 @@
-Flask==2.2.*
-# Add any other dependencies, e.g. SQLAlchemy, requests, etc.
