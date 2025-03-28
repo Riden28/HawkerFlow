@@ -1,61 +1,86 @@
 import os
 from dotenv import load_dotenv
-from flask import Flask, jsonify
+from flask import Flask, jsonify, abort
 from google.cloud import firestore
 from google.oauth2 import service_account
 
-# Load environment variables from .env file
+# Load environment variables (if using a .env file)
 load_dotenv()
 
 app = Flask(__name__)
 
+# Retrieve environment variables for credentials and project
 service_account_path = os.environ.get("FIREBASE_SERVICE_ACCOUNT_KEY_PATH")
-if not service_account_path:
-    raise ValueError("FIREBASE_SERVICE_ACCOUNT_KEY_PATH not set")
-
-# Load credentials using google.oauth2
-cred = service_account.Credentials.from_service_account_file(service_account_path)
-
 project_id = os.environ.get("FIREBASE_PROJECT_ID")
-if not project_id:
-    raise ValueError("FIREBASE_PROJECT_ID not set")
+if not service_account_path or not project_id:
+    raise ValueError("Required environment variables are not set.")
 
-# Create a Firestore client for your named database (e.g., "menu")
-menu_db = firestore.Client(project=project_id, credentials=cred, database='menu')
-db = menu_db
+# Create credentials from your service account JSON
+cred = service_account.Credentials.from_service_account_file(service_account_path)
+# Initialize the Firestore client
+db = firestore.Client(project=project_id, credentials=cred, database='menu')
 
-@app.route('/menu', methods=['GET'])
-def get_all_stalls():
+@app.route("/menu/<hawkername>", methods=["GET"])
+def get_stalls_in_hawkercenter(hawkername):
     """
-    Returns all the data in the 'menu' database.
-    Each top-level collection (stall) and its documents (dishes) are included.
+    Returns all hawker stalls in the specified hawker center.
+    Each stall document includes the fields:
+      - category: string (e.g., "Chinese")
+      - description: string (e.g., "Specializing in traditional Fuzhou-style oyster cakes...")
+      - rating: number (e.g., 5)
+      - stallPhoto: string (storage link)
+    Example: /menu/Maxwell%20Food%20Center
     """
-    all_data = {}
-    # Get all top-level collections (each representing a stall)
-    stall_collections = db.collections()
-    for coll in stall_collections:
-        stall_id = coll.id
-        dishes = []
-        # Iterate through all dish documents in the stall collection
-        for doc in coll.stream():
-            dish_data = doc.to_dict()
-            dish_data["dishId"] = doc.id  # Optionally include the document ID
-            dishes.append(dish_data)
-        all_data[stall_id] = dishes
+    # Query the collection named after the hawker center
+    stalls_ref = db.collection(hawkername)
+    docs = stalls_ref.stream()
 
-    return jsonify(all_data), 200
+    stalls = []
+    for doc in docs:
+        stall_data = doc.to_dict()
+        # Include the stall name (document ID)
+        stall_data["stallName"] = doc.id
+        stalls.append(stall_data)
+    
+    if not stalls:
+        return jsonify({"error": "Hawker center not found or no stalls available."}), 404
+    
+    return jsonify(stalls), 200
 
-@app.route('/menu/<stall_id>', methods=['GET'])
-def get_stall_dishes(stall_id):
-    # Retrieve all documents (dishes) in the specified stall collection
-    stall_ref = db.collection(stall_id)
-    docs = stall_ref.stream()
+@app.route("/menu/<hawkername>/<stallname>", methods=["GET"])
+def get_dishes_in_stall(hawkername, stallname):
+    """
+    Returns all dishes for the specified hawker stall.
+    Each dish document in the 'Dishes' subcollection includes:
+      - description: string (e.g., "Traditional crispy cake filled with oysters...")
+      - dishPhoto: string (storage link)
+      - inStock: boolean (e.g., true)
+      - price: number (e.g., 5)
+      - waitTime: number (in minutes, e.g., 12)
+    Example: /menu/Maxwell%20Food%20Center/Zhen%20Zhen%20Porridge
+    """
+    # Verify the hawker stall document exists
+    stall_doc_ref = db.collection(hawkername).document(stallname)
+    stall_doc = stall_doc_ref.get()
+    if not stall_doc.exists:
+        return jsonify({"error": "Hawker stall not found."}), 404
+
+    # Reference the "Dishes" subcollection within the stall document
+    dishes_ref = stall_doc_ref.collection("Dishes")
+    docs = dishes_ref.stream()
+
     dishes = []
     for doc in docs:
         dish_data = doc.to_dict()
-        dish_data["dishId"] = doc.id
+        # Include the dish name (document ID)
+        dish_data["dishName"] = doc.id
         dishes.append(dish_data)
-    return jsonify({"stallId": stall_id, "dishes": dishes}), 200
+    
+    if not dishes:
+        return jsonify({"error": "No dishes found for this stall."}), 404
+    
+    return jsonify(dishes), 200
 
 if __name__ == '__main__':
+    # Run the Flask app on host 0.0.0.0 and port 5000
     app.run(host='0.0.0.0', port=5000, debug=True)
