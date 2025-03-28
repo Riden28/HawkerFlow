@@ -2,6 +2,3 @@ python-dotenv
 Flask
 google-cloud-firestore
 google-auth
-fastapi
-pydantic
-firebase-admin
