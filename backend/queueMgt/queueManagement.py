@@ -1,35 +1,55 @@
+import os
+from dotenv import load_dotenv
+from flask import Flask, jsonify
+from google.cloud import firestore
+from google.oauth2 import service_account
 from typing import List, Dict, Optional
-from fastapi import FastAPI, Query
-from pydantic import BaseModel
-import firebase_admin
 from firebase_admin import credentials, firestore
 
-# Initialize Firebase Admin
-cred = credentials.Certificate("serviceAccountKey.json")
-firebase_admin.initialize_app(cred)
-db = firestore.client()
+load_dotenv()
 
-# Reference to Firestore collection:
-orders_collection = db.collection("queueOrders")
+app = Flask(__name__)
 
-# -----------------------
-# Pydantic Models
-# -----------------------
-class StallData(BaseModel):
-    dishes: List[int]
+import os
+from dotenv import load_dotenv
+from google.oauth2 import service_account
+from google.cloud import firestore as gc_firestore
 
-class QueueOrder(BaseModel):
-    orderId: int
-    userId: int
-    stalls: Dict[int, StallData]
+load_dotenv()
 
-class OrderStatusUpdate(BaseModel):
-    orderStatus: str  # e.g. "completed"
+cred_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_KEY_PATH")
 
-# -----------------------
-# FastAPI App
-# -----------------------
-app = FastAPI(title="Queue Management Microservice")
+if not os.path.exists(cred_path):
+    raise FileNotFoundError(f"Service account file not found: {cred_path}")
+
+cred = service_account.Credentials.from_service_account_file(cred_path)
+
+db = gc_firestore.Client(
+    project=os.getenv("FIREBASE_PROJECT_ID"),
+    credentials=cred,
+    database="queue"
+)
+
+@app.route('/menu', methods=['GET'])
+def get_all_stalls():
+    """
+    Returns all the data in the 'menu' database.
+    Each top-level collection (stall) and its documents (dishes) are included.
+    """
+    all_data = {}
+    # Get all top-level collections (each representing a stall)
+    stall_collections = db.collections()
+    for coll in stall_collections:
+        stall_id = coll.id
+        dishes = []
+        # Iterate through all dish documents in the stall collection
+        for doc in coll.stream():
+            dish_data = doc.to_dict()
+            dish_data["dishId"] = doc.id  # Optionally include the document ID
+            dishes.append(dish_data)
+        all_data[stall_id] = dishes
+
+    return jsonify(all_data), 200
 
 # ---------------------------------------------------
 # 1) POST /api/queue
@@ -55,7 +75,7 @@ async def create_queue_order(queue_order: QueueOrder):
         batch = db.batch()
         
         for stall_id, stall_data in queue_order.stalls.items():
-            doc_ref = orders_collection.document()  # auto-generate doc ID
+            doc_ref = db.document()  # auto-generate doc ID
             doc_data = {
                 "orderId": queue_order.orderId,
                 "userId": queue_order.userId,
@@ -206,3 +226,7 @@ async def update_order_status(docId: str, statusUpdate: OrderStatusUpdate):
         return {"message": "Order updated and notification sent.", "notifPayload": notify_payload}
     except Exception as e:
         return {"error": str(e)}
+    
+
+if __name__ == '__main__':
+    app.run(debug=True)
