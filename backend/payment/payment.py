@@ -2,40 +2,49 @@ import os
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from dotenv import load_dotenv
-from invokes import invoke_http
 import stripe
-load_dotenv()
 
+#import key 
+
+#rmb to change to dot.env for 
+#load_dotenv()
+# stripe.api_key = os.getenv("STRIPE_API_KEY")
+stripe.api_key = "sk_test_51R80VkFKfP7LOez7rS4YzRjqpzKZKFHVh2opY6BEEjMXzc5Agh6o6FRPgOaJLdI4vUxtORNbbiw4fGzAi5mVP0h800HUKmpr0Q"
 
 app = Flask(__name__)
 CORS(app)
 
-#to do: 
-#1. input port and host at the bottom
-"""
-    data = {
-        "paymentAmount":int,
-        "card_no":"4242424242424242",
-        "exp_date":"10/26",
-        "cvc":"017"    
-    }
-"""
-
 @app.route('/payment', methods=['POST'])
 def payment():
     data = request.get_json()
-    #insert error handling here before sending "good" data to stripe api microservice if needed
-    result = invoke_http(os.environ.get("stripe_url"),
-                            method='POST', json=data)
-    
-    if result["code"] == 200:
-            return jsonify({
-                "code": 200,
-                "data": {"message": "Payment successful", "status": "success"}
-            }), 200
-    
+
+    payment_amount = data["paymentAmount"]
+    token = data["token"]
+
+    try:
+        # Create a PaymentIntent using the test token
+        payment_intent = stripe.PaymentIntent.create(
+            amount=payment_amount * 100,  # Amount in cents (e.g., $10.00)
+            currency="sgd",
+            #change once frontend can deliver the token
+            # payment_method=token_id,  # Use the test token ID here
+            # confirm=True  # Confirm the payment immediately
+            automatic_payment_methods={"enabled": True}
+        )
+
+        # Return a success response
+        return jsonify({
+            "code": 200,
+            "data": {"message": "Payment successful", "status": "success", "paymentIntent": payment_intent}
+        }), 200
+
+    except stripe.error.CardError as e:
+        # Handle card error (e.g., insufficient funds, etc.)
+        return jsonify({
+            "code": 400,
+            "data": {"message": f'{e}', "status": "failed"}
+        }), 400
+        
 if __name__ == "__main__":
-    #insert port and host
-    "app.run(debug=True, port=xxxx, host='0.0.0.0')"
-
-
+    #change port for full testing if needed
+    app.run(debug=True, port=5000, host='0.0.0.0')
