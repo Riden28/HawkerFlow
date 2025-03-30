@@ -232,6 +232,10 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
             }
             publish_message("Notif", notif_data)
             publish_message("Log", log_data)
+
+            #deletes the order from db
+            order_ref.delete()
+
             return jsonify({
                 "message": "Order fully completed and notifications published.",
                 "orderId": orderId
