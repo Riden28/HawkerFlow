@@ -155,6 +155,7 @@ def create_order():
         # Compute Payment Amount by calling the MENU microservice for each stall
         #######################################################################
         total_payment_amount = 0.0
+        some_token = "somedongdong"
 
         for stallName, stallData in stalls_dict.items():
             # For each stall, retrieve the dish array from the Menu microservice
@@ -190,7 +191,7 @@ def create_order():
         #######################################################################
         payment_payload = {
             "paymentAmount": total_payment_amount,
-            # "token": some_token
+            "token": some_token
         }
 
         payment_status = "failed"  # Default to failed unless Payment says success
