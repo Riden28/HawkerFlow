@@ -2,9 +2,9 @@ import pika
 
 amqp_host = "localhost"
 amqp_port = 5672
-exchange_name = "order_completed"
+order_exchange_name = "order_exchange"
+queue_exchange_name = "queue_exchange"
 exchange_type = "topic"
-
 
 def create_exchange(hostname, port, exchange_name, exchange_type):
     print(f"Connecting to AMQP broker {hostname}:{port}...")
@@ -43,25 +43,52 @@ def create_queue(channel, exchange_name, queue_name, routing_key):
     )
 
 #Queue Management
-channel = create_exchange(
+queue_channel = create_exchange(
     hostname=amqp_host,
     port=amqp_port,
-    exchange_name=exchange_name,
+    exchange_name=queue_exchange_name, #queue_exchange
     exchange_type=exchange_type,
 )
 
 create_queue(
-    channel=channel,
-    exchange_name=exchange_name,
-    queue_name="Notif",
+    channel=queue_channel,
+    exchange_name=queue_exchange_name,  #queue_exchange
+    queue_name="Q_notif",
     routing_key="*.notif",
 )
 
 create_queue(
-    channel=channel,
-    exchange_name=exchange_name,
-    queue_name="Log",
+    channel=queue_channel,
+    exchange_name=queue_exchange_name, #queue_exchange
+    queue_name="Q_log",
+    routing_key="*.log",
+)
+
+create_queue(
+    channel=queue_channel,
+    exchange_name=queue_exchange_name, #queue_exchange
+    queue_name="Q_customer",
     routing_key="*.customer",
 )
 
 #Order Management
+order_channel = create_exchange(
+    hostname=amqp_host,
+    port=amqp_port,
+    exchange_name=order_exchange_name, #order_exchange
+    exchange_type=exchange_type,
+)
+
+create_queue(
+    channel=queue_channel,
+    exchange_name=order_exchange_name, #order_exchange
+    queue_name="O_notif",
+    routing_key="*.notif",
+)
+
+create_queue(
+    channel=queue_channel,
+    exchange_name=order_exchange_name, #order_exchange
+    queue_name="O_Queue",
+    routing_key="*.queue",
+)
