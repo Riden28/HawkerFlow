@@ -1,5 +1,14 @@
 version: '3'
 services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+  
   menu:
     build: ./menu
     ports:
@@ -22,3 +31,15 @@ services:
     environment:
       - ACTIVITY_LOG_URL=http://activityLog:5000
       - MENU_SERVICE_URL=http://menu:5000
+
+  queue-management:
+    build: .
+    ports:
+      - "5000:5000"
+    depends_on:
+      - rabbitmq
+    environment:
+      FIREBASE_SERVICE_ACCOUNT_KEY_PATH: /app/serviceAccount.json
+      FIREBASE_PROJECT_ID: your-project-id
+    volumes:
+      - .:/app

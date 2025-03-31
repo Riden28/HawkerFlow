@@ -2,44 +2,66 @@
 # import amqp_connection
 import json
 import pika
-#import amqp_setup
-from os import environ
+import amqp_setup
+from dotenv import load_dotenv
+import os
 
-#from dotenv import load_dotenv
-#load_dotenv()
+
+load_dotenv()
 
 # twilio set up
 import os
 from twilio.rest import Client
 
 #from .env
-# account_sid = os.getenv("TWILIO_ACCOUNT_SID")
-# auth_token = os.getenv("TWILIO_AUTH_TOKEN")
-# twilio_phone_number = os.getenv("TWILIO_PHONE_NUMBER")
+account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
+auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
+twilio_phone_number = os.environ.get("TWILIO_PHONE_NUMBER")
 
 #for testing
-account_sid = "ACe9d633942cc908a6bf389ac28800f2af"
-auth_token = "fa1db3e25f403916e86dc9eb1dc826bb"
-twilio_phone_number = "+15049772047"
 message_body = "hello world"
 contact = "+6597730551"
 
 client = Client(account_sid, auth_token)
 #end of twilio set up 
 
+""" 
+DS from order management #scenario 1: notify payment and order success
 
-#set up the consumer 
+notificationRequest: {
+    emailID: "string",
+    orderId: int,
+    "paymentStatus": "string" // e.g., "success", "failed",
+    "paymentNnumber":"+65xxxxxxxx"
+}
+
+DS from queuemanagement #scenario 2: notify order completed
+{
+    "orderId": int,
+    "userId": int,
+    "orderStatus": "completed",
+    "paymentNumber":"+65xxxxxxxx"
+}
+"""
+
+
+# set up the consumer for both payment completed and order completed
 def receiveNotification():
     try:
         amqp_setup.check_setup()
         
-        queue_name = "<insert the queue name>"   
+        #queue name 
+        order_completed_queue_name = "QNotif"
+        payment_completed_queue_name = "ONotif"
 
         # set up a consumer and start to wait for coming messages
-        amqp_setup.channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=True)
+        amqp_setup.channel.basic_consume(queue=order_completed_queue_name, on_message_callback=callbackOrderCompletedNotification, auto_ack=True)
+        amqp_setup.channel.basic_consume(queue=payment_completed_queue_name, on_message_callback=callbackPaymentCompletedNotification, auto_ack=True)
+
         amqp_setup.channel.start_consuming() # an implicit loop waiting to receive messages; 
         #it doesn't exit by default. Use Ctrl+C in the command window to terminate it.
-        print("Notification_Log: Consuming from queue:", "<insert the queue name>")
+        print("Notification_Log: Consuming from queue:",  f'{order_completed_queue_name}')
+        print("Notification_Log: Consuming from queue:",  f'{payment_completed_queue_name}')
     
     except pika.exceptions.AMQPError as e:
         print(
@@ -49,45 +71,21 @@ def receiveNotification():
     except KeyboardInterrupt:
         print("Notification_Log: Program interrupted by user.")
 
-#Callback fucntion to keep listening 
-def callback(channel, method, properties, body): # required signature for the callback; no return
+#Callback fucntion to keep listening  for notifications from queue management
+def callbackOrderCompletedNotification(channel, method, properties, body): # required signature for the callback; no return
     print("\nReceived a Notification by " + __file__)
-    processNotification(body)
+    processOrderCompletedNotification(body)
     print() # print a new line feed
     
-""" 
-##note: check with the team if u need set up 2 consumer listening to 2 
-DS from order management #scenario 1: notify payment and order success
 
-notificationRequest: {
-    emailID: "string",
-    orderId: int,
-    paymentStatus: "string" // e.g., "success", "failed"
-    #need the phonenumber
-}
-
-DS from queuemanagement #scenario 2: notify order completed
-{
-    "orderId": int,
-    "userId": int,
-    "orderStatus": "completed"
-    #need the phonenumber 
-}
-"""
-
-#to edit 
-def processNotification(body):
+# to edit 
+def processOrderCompletedNotification(body):
     try:
         data = json.loads(body)
-        if "paymentStatus" in data:
-            message_body = data["paymentStatus"]
-            contact = data["phoneNumber"]
-            send_sms(contact, message_body)
-            return 
-        
+     
         if "orderStatus" in data:
             message_body = data["orderStatus"]
-            contact = data["phoneNumber"]
+            contact = data["paymentNumber"]
             send_sms(contact, message_body)
             return 
             
@@ -97,7 +95,29 @@ def processNotification(body):
     print()
         
 
-#twilio send sms function 
+#Callback fucntion to keep listening  for notifications from queue management
+def callbackPaymentCompletedNotification(channel, method, properties, body): # required signature for the callback; no return
+    print("\nReceived a Notification by " + __file__)
+    processPaymentCompletedNotification(body)
+    print() # print a new line feed
+
+def processPaymentCompletedNotification(body):
+    try:
+        data = json.loads(body)
+     
+        if "paymentStatus" in data:
+            message_body = data["paymentStatus"]
+            contact = data["paymentNumber"]
+            send_sms(contact, message_body)
+            return 
+            
+    except Exception as e:
+        print("--NOT JSON:", e)
+        print("--DATA:", body)
+    print()
+  
+
+#twilio send sms function for messages from both queues
 def send_sms(contact, message_body):
     # use twilio to send message
     try:
@@ -113,8 +133,6 @@ if (
     __name__ == "__main__"
 ):  # execute this program only if it is run as a script (not by 'import')
     print("Notification_Log: Getting Connection")
-    connection = amqp_connection.create_connection()  # get the connection to the broker
     print("Notification_Log: Connection established successfully")
-    channel = connection.channel()
-    receiveNotification(channel)
+    receiveNotification()
 
