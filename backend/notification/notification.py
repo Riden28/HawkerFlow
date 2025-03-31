@@ -19,8 +19,8 @@ auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
 twilio_phone_number = os.environ.get("TWILIO_PHONE_NUMBER")
 
 #for testing
-message_body = "hello world"
-contact = "+6597730551"
+# message_body = "hello world"
+# contact = "+6597730551"
 
 client = Client(account_sid, auth_token)
 #end of twilio set up 
