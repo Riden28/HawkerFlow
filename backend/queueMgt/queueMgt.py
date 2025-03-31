@@ -1,9 +1,9 @@
 import os, pika, json, time
+import threading
 from dotenv import load_dotenv
 from flask import Flask, jsonify, abort, request
 from google.cloud import firestore
 from google.oauth2 import service_account
-from amqp_setup import get_channel
 
 # Load environment variables (if using a .env file)
 load_dotenv()
@@ -20,6 +20,14 @@ if not service_account_path or not project_id:
 cred = service_account.Credentials.from_service_account_file(service_account_path)
 # Initialize the Firestore client
 db = firestore.Client(project=project_id, credentials=cred, database='queue')
+
+# RabbitMQ config
+RABBITMQ_HOST = 'localhost' #changeforDocker
+EXCHANGE_NAME = 'queue_exchange'
+QUEUE_NAME = 'O_queue'
+connection = pika.BlockingConnection(pika.ConnectionParameters(RABBITMQ_HOST))
+channel = connection.channel()
+
 
 #consume=====================================================================================================================================
 
@@ -42,7 +50,7 @@ def process_order(ch, method, properties, body):
 
             # Reference to the order subcollection
             order_ref = stall_ref.collection("order").document(orderDetails["orderId"])
-
+            
             # Build the dish data
             dish_data = {}
             total_wait_time = 0
@@ -80,26 +88,20 @@ def process_order(ch, method, properties, body):
     except Exception as e:
         print(f"Error processing order: {e}")
 
-# Connect to RabbitMQ and start consuming
-RABBITMQ_HOST = 'rabbitmq'  #update
-QUEUE_NAME = 'O_queue'  #update
-channel = get_channel()
+#Start consuming
+def start_rabbitmq_consumer():
+    channel.queue_declare(queue=QUEUE_NAME , durable=True)
+    print(f"Listening for orders on queue: {QUEUE_NAME}")
 
-channel.queue_declare(queue=QUEUE_NAME , durable=True)
-print(f"Listening for orders on queue: {QUEUE_NAME}")
+    channel.basic_consume(queue=QUEUE_NAME, on_message_callback=process_order, auto_ack=True)
 
-channel.basic_consume(queue=QUEUE_NAME, on_message_callback=process_order, auto_ack=True)
-
-try:
-    channel.start_consuming()
-except KeyboardInterrupt:
-    print("Stopped consuming.")
-    channel.stop_consuming()
+    try:
+        channel.start_consuming()
+    except KeyboardInterrupt:
+        print("Stopped consuming.")
+        channel.stop_consuming()
 
 #publisher=====================================================================================================================================
-
-# RabbitMQ config
-EXCHANGE_NAME = 'queue_exchange'
 
 # RabbitMQ publish function
 def publish_message(routing_key: str, message: dict):
@@ -111,9 +113,9 @@ def publish_message(routing_key: str, message: dict):
             properties=pika.BasicProperties(delivery_mode=2)
         )
         
-        print(f"Published to {EXCHANGE_NAME}: {message}")
+        print(f"Published {routing_key}: {message}")
     except Exception as e:
-        print(f"Failed to publish to {EXCHANGE_NAME}: {e}")
+        print(f"Failed to publish {routing_key}: {e}")
 
 #APIs=====================================================================================================================================
 
@@ -177,6 +179,7 @@ def is_order_completed(order_data):
             continue
         #checks the value is in dict & value of complete is False, it returns true & returns false immediately
         if not isinstance(value, dict) or not value.get("completed"): 
+            print(f"Not completed: {key} -> {value}")
             return False
     return True
 
@@ -185,34 +188,68 @@ def build_activity_log_payload(order_data):
 
     for dish_name, dish_info in order_data.items():
         # Skip non-dish fields
-        if dish_name in {"userId", "email"}:
+        if dish_name in {"userId", "phoneNumber"}:
             continue
+
+        start_time = dish_info.get("time_started")
+        end_time = dish_info.get("time_completed")
 
         activity_log[dish_name] = {
             "stallName": dish_info.get("stallName"),
             "quantity": dish_info.get("quantity"),
-            "orderStartTime": dish_info.get("time_started"),
-            "orderEndTime": dish_info.get("time_completed"),
+            "orderStartTime": start_time.isoformat(),
+            "orderEndTime": end_time.isoformat()
         }
-
+    print(activity_log)
     return activity_log
 
 @app.route('/<hawkerCenter>/<hawkerStall>/orders/<orderId>/<dishName>/complete', methods=['PATCH'])
 def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
     try:
-        order_ref = db.collection(hawkerCenter).document(hawkerStall).collection("order").document(orderId)
-
-        order_snapshot = order_ref.get()
-        if not order_snapshot.exists:
+        order_ref = db.collection(hawkerCenter).document(hawkerStall).collection("orders").document(orderId)
+        order_doc = order_ref.get()
+        if not order_doc.exists:
             return {"error": "Order not found"}, 404
+        
+        order_data = order_doc.to_dict()
 
+        # Get the wait time for this dish
+        dish_data = order_data.get(dishName)
+        if not dish_data:
+            return {"error": "Dish not found in order"}, 404
+
+        dish_time = dish_data.get("waitTime")
+        if dish_time is None:
+            return {"error": "Dish wait time not set"}, 400
+        
+        quantity = dish_data.get("quantity")
+        if dish_time is None:
+            return {"error": "Dish quantity not set"}, 400
+        
+        # Mark dish as completed
         updates = {
             f"{dishName}.completed": True,
             f"{dishName}.time_completed": firestore.SERVER_TIMESTAMP
         }
         order_ref.update(updates)
 
-        time.sleep(0.2)
+        # Subtract dish wait time from stall's estimated wait time
+        stall_ref = db.collection(hawkerCenter).document(hawkerStall)
+        stall_doc = stall_ref.get()
+
+        if not stall_doc.exists:
+            return {"error": "Stall not found"}, 404
+
+        stall_data = stall_doc.to_dict()
+        current_wait_time = stall_data.get("estimatedWaitTime")
+
+        if current_wait_time is None:
+            return {"error": "Stall's estimated wait time not set"}, 400
+
+        new_wait_time = max(current_wait_time - dish_time * quantity, 0)  # Avoid negative time
+        stall_ref.update({"estimatedWaitTime": new_wait_time})
+
+        time.sleep(1)
         updated_order_data = order_ref.get().to_dict()
 
         #front end code here to update front ended
@@ -220,6 +257,7 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
 
         #publish order
         if is_order_completed(updated_order_data):
+            
             log_data = build_activity_log_payload(updated_order_data)
             notif_data = {
                 "orderId": orderId,
@@ -239,7 +277,7 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
             }), 200
         
         return jsonify({
-            "message": f"'{dishName}' marked as completed.",
+            "message": f"'{dishName}' marked as completed, wait time updated.",
             "orderId": orderId
         }), 200
 
@@ -248,4 +286,7 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
         return {"error": "Internal server error"}, 500
 
 if __name__ == '__main__':
+    # if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+    threading.Thread(target=start_rabbitmq_consumer, daemon=True).start()
+    # Start Flask app in the main thread
     app.run(debug=True, port=5000)

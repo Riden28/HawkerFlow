@@ -1,45 +1,55 @@
-version: '3'
+version: "3.9"
+
 services:
   rabbitmq:
     image: rabbitmq:3-management
+    container_name: rabbitmq
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "5672:5672"   # for AMQP
+      - "15672:15672" # for RabbitMQ management UI
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
-  
-  menu:
-    build: ./menu
-    ports:
-      - "5001:5000"
-    environment:
-      - FIREBASE_SERVICE_ACCOUNT_KEY_PATH=/run/secrets/firebase_key.json
-      - FIREBASE_PROJECT_ID=my-project
+    networks:
+      - backend
 
-  activityLog:
-    build: ./activityLog
-    ports:
-      - "5002:5000"
-    environment:
-      - SOME_ACTIVITY_LOG_ENV=whatever
-
-  aggregator:
-    build: ./aggregator
+  queue_mgt:
+    build:
+      context: .
+      dockerfile: queueManagement.Dockerfile
+    container_name: queue_mgt
+    command: python queueMgt.py
     ports:
       - "5000:5000"
     environment:
-      - ACTIVITY_LOG_URL=http://activityLog:5000
-      - MENU_SERVICE_URL=http://menu:5000
-
-  queue-management:
-    build: .
-    ports:
-      - "5000:5000"
+      - FIREBASE_SERVICE_ACCOUNT_KEY_PATH=/run/secrets/firebase_key
+      - FIREBASE_PROJECT_ID=your-project-id
+    secrets:
+      - firebase_key
     depends_on:
       - rabbitmq
+    networks:
+      - backend
+
+  notification:
+    build:
+      context: .
+      dockerfile: notification.Dockerfile
+    container_name: notification
+    command: python notification.py
     environment:
-      FIREBASE_SERVICE_ACCOUNT_KEY_PATH: /app/serviceAccount.json
-      FIREBASE_PROJECT_ID: your-project-id
-    volumes:
-      - .:/app
+      - TWILIO_ACCOUNT_SID=your_sid
+      - TWILIO_AUTH_TOKEN=your_token
+      - TWILIO_PHONE_NUMBER=+65xxxxxxx
+    depends_on:
+      - rabbitmq
+    networks:
+      - backend
+
+secrets:
+  firebase_key:
+    file: ./hawkerflow-key.json
+
+networks:
+  backend:
+    driver: bridge

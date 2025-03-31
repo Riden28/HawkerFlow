@@ -20,83 +20,79 @@ if not service_account_path or not project_id:
 cred = service_account.Credentials.from_service_account_file(service_account_path)
 db = firestore.Client(project=project_id, credentials=cred, database='queue')
 
-# # Simulated RabbitMQ message structure
-orderDetails = {
-    "hawkerCentre": "Maxwell Food Centre",
-    "orderId": "order_011",
-    "email": "jane.doe@example.com",
-    "userId": "user_002",
-    "stalls": {
-        "Maxwell Fuzhou Oyster Cake": {
-            "dishes": [
-                {
-                    "dishName": "Fried Carrot Cake",
-                    "quantity": 1,
-                    "waitTime": 6
-                }
-            ]
-        },
-        "Tian Tian Hainanese Chicken Rice": {
-            "dishes": [
-                {
-                    "dishName": "Chicken Rice",
-                    "quantity": 1,
-                    "waitTime": 8
-                },
-                {
-                    "dishName": "Iced Tea",
-                    "quantity": 2,
-                    "waitTime": 5
-                }
-            ]
-        }
-    },
-    "paymentStatus": "paid"
+import os, random
+from google.cloud import firestore
+from google.oauth2 import service_account
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+service_account_path = os.environ.get("FIREBASE_SERVICE_ACCOUNT_KEY_PATH")
+project_id = os.environ.get("FIREBASE_PROJECT_ID")
+
+cred = service_account.Credentials.from_service_account_file(service_account_path)
+db = firestore.Client(project=project_id, credentials=cred, database='queue')
+
+# 🔖 Configuration
+hawker_centres = [
+    "Bukit Timah",
+    "Lagoon Hawker Centre",
+    "Maxwell Food Centre"
+]
+
+stalls = {
+    "Chicken Rice Stall": ["Chicken Rice", "Roasted Chicken", "Egg"],
+    "Noodle Stall": ["Fishball Noodles", "Laksa", "Wanton Mee"]
 }
 
-# Loop through each stall
-for stall_name, data in orderDetails["stalls"].items():
-    # Reference to the stall document
-    stall_ref = db.collection(orderDetails["hawkerCentre"]).document(stall_name)
+# 🔁 Create each hawker centre with 2 stalls and 4 orders each
+for centre in hawker_centres:
+    print(f"\n🏢 Setting up Hawker Centre: {centre}")
 
-    # Ensure estimatedWaitTime is added if not present
-    stall_doc = stall_ref.get()
-    if not stall_doc.exists:
-        stall_ref.set({"estimatedWaitTime": 0})  # Init if needed
+    for stall_name, dishes in stalls.items():
+        print(f"  🍽️ Stall: {stall_name}")
 
-    # Reference to the order subcollection
-    order_ref = stall_ref.collection("order").document(orderDetails["orderId"])
+        # Create or reset stall doc
+        stall_ref = db.collection(centre).document(stall_name)
+        stall_ref.set({"estimatedWaitTime": 0})
 
-    # Build the dish data
-    dish_data = {}
-    total_wait_time = 0
-    order_data = {
-        "userID": orderDetails["userId"],
-        "email": orderDetails["email"]
-    }
+        stall_total_wait = 0
+        order_counter = 1  # Reset per stall
 
-    for dish_info in data["dishes"]:
-        dish_name = dish_info["dishName"]
-        wait_time = dish_info["waitTime"]
-        quantity = dish_info["quantity"]
-        
-        dish_data[dish_name] = {
-            "completed": False,
-            "quantity": quantity,
-            "time_started": firestore.SERVER_TIMESTAMP,
-            "waitTime": wait_time,
-        }
+        for _ in range(4):  # 4 orders
+            order_id = f"order_{order_counter:03d}"
+            order_counter += 1
 
-        total_wait_time += wait_time * quantity
-        order_data.update(dish_data) 
+            # 🔁 Subcollection is now 'orders' (plural)
+            order_ref = stall_ref.collection("orders").document(order_id)
 
-    # Add dish data under the order document
+            order_data = {
+                "userId": f"user_{stall_name[:3]}_{order_id}",
+                "phoneNumber": f"9123{random.randint(1000,9999)}"
+            }
 
-    order_ref.set(order_data)
+            selected_dishes = random.sample(dishes, 2)
 
-    # Optionally increment estimatedWaitTime (basic example)
-    stall_ref.update({
-        "estimatedWaitTime": firestore.Increment(total_wait_time)
-    })
+            for dish in selected_dishes:
+                quantity = random.randint(1, 3)
+                wait_time = random.randint(5, 10)
+                total_dish_wait = wait_time * quantity
 
-print("Order stored successfully.")
+                stall_total_wait += total_dish_wait
+
+                order_data[dish] = {
+                    "completed": False,
+                    "quantity": quantity,
+                    "waitTime": wait_time,
+                    "time_started": firestore.SERVER_TIMESTAMP,
+                    "time_completed": None,
+                }
+
+            order_ref.set(order_data)
+            print(f"    ✅ Created {order_id} with dishes: {selected_dishes}")
+
+        # Update accurate total wait time
+        stall_ref.update({"estimatedWaitTime": stall_total_wait})
+        print(f"  ⏳ Estimated wait time set: {stall_total_wait} mins")
+
+print("\n🎉 All hawker centres seeded successfully with clean order IDs and 'orders' subcollections!")
