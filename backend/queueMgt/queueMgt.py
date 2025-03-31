@@ -50,7 +50,7 @@ def process_order(ch, method, properties, body):
             total_wait_time = 0
             order_data = {
                 "userId": orderDetails["userId"],
-                "email": orderDetails["email"]
+                "phoneNumber": orderDetails["phoneNumber"]
             }
 
             for dish_info in data["dishes"]:
@@ -176,7 +176,7 @@ def get_all_orders(hawkerCenter, hawkerStall):
 
 #PATCH - Scenario 2: Mark Order as Completed
 def is_order_completed(order_data):
-    ignore = {"userId", "email"}
+    ignore = {"userId", "phoneNumber"}
 
     for key, value in order_data.items():
         if key in ignore: #skip fields 
@@ -221,13 +221,15 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
         time.sleep(0.2)
         updated_order_data = order_ref.get().to_dict()
 
+        #code here to update front ended
+
         #publish order
         if is_order_completed(updated_order_data):
             log_data = build_activity_log_payload(updated_order_data)
             notif_data = {
                 "orderId": orderId,
                 "userId": updated_order_data.get("userId"),
-                "email": updated_order_data.get("email"),
+                "phoneNumber": updated_order_data.get("phoneNumber"),
                 "orderStatus": "completed"
             }
             publish_message("Notif", notif_data)
