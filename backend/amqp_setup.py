@@ -89,6 +89,6 @@ create_queue(
 create_queue(
     channel=queue_channel,
     exchange_name=order_exchange_name, #order_exchange
-    queue_name="O_Queue",
+    queue_name="O_queue",
     routing_key="*.queue",
 )

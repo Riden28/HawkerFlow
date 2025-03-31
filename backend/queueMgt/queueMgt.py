@@ -24,7 +24,7 @@ db = firestore.Client(project=project_id, credentials=cred, database='queue')
 
 #Consuming from RabbitMQ
 RABBITMQ_HOST = 'rabbitmq'  #update
-QUEUE_NAME = 'order_queue'  #update
+QUEUE_NAME = 'O_queue'  #update
 
 def process_order(ch, method, properties, body):
     try:
@@ -83,7 +83,6 @@ def process_order(ch, method, properties, body):
         print(f"Error processing order: {e}")
 
 # Connect to RabbitMQ and start consuming
-connection = pika.BlockingConnection(pika.ConnectionParameters(RABBITMQ_HOST))
 channel = connection.channel()
 
 channel.queue_declare(queue=QUEUE_NAME)
@@ -101,8 +100,8 @@ except KeyboardInterrupt:
 #publisher=====================================================================================================================================
 
 # RabbitMQ config
-RABBITMQ_HOST = 'rabbitmq'  # Use 'rabbitmq' if running via docker-compose
-REPLY_QUEUE = 'dish_completed_queue'  # You can rename this
+RABBITMQ_HOST = 'rabbitmq'  # update this
+REPLY_QUEUE = 'O_queue'  # update this
 
 # RabbitMQ publish function
 def publish_message(queue_name: str, message: dict):
@@ -123,7 +122,7 @@ def publish_message(queue_name: str, message: dict):
 
 #APIs=====================================================================================================================================
 
-#GET - Scenario 2: Custoemr UI pulls current wait time
+#GET - Scenario 1: Customer UI pulls current wait time
 @app.route('/<hawkerCenter>/<hawkerStall>/waitTime', methods=['GET'])
 def get_estimated_wait_time(hawkerCenter, hawkerStall):
     try:
@@ -221,7 +220,7 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
         time.sleep(0.2)
         updated_order_data = order_ref.get().to_dict()
 
-        #code here to update front ended
+        #front end code here to update front ended
 
         #publish order
         if is_order_completed(updated_order_data):
