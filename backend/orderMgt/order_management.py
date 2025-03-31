@@ -10,7 +10,7 @@ from google.cloud import firestore
 from google.oauth2 import service_account
 
 # Load environment variables from a .env file
-load_dotenv(dotenv_path='../../.env')
+load_dotenv(dotenv_path='.env')
 
 app = Flask(__name__)
 
