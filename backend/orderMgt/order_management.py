@@ -31,11 +31,11 @@ def get_stalls_for_hawker_center(hawkerCenter):
     - Proxies the request to the MENU microservice to fetch a list of stalls in a hawker center.
     - The MENU microservice returns a JSON array of stalls, each containing:
         {
-          "category": "Chinese",
-          "description": "...",
-          "rating": 5,
-          "stallName": "Maxwell Fuzhou Oyster Cake",
-          "stallPhoto": "storage link"
+            "category": "Chinese",
+            "description": "...",
+            "rating": 5,
+            "stallName": "Maxwell Fuzhou Oyster Cake",
+            "stallPhoto": "storage link"
         }
     """
     try:
@@ -60,12 +60,12 @@ def get_menu_for_stall(hawkerCenter, hawkerStall):
     - Proxies the request to the MENU microservice to fetch all menu items for a given stall.
     - The MENU microservice returns a JSON array of dish objects:
         {
-          "dishName": "Chicken Rice (Regular)",
-          "description": "...",
-          "dishPhoto": "storage link",
-          "inStock": true,
-          "price": 5.5,
-          "waitTime": 8
+            "dishName": "Chicken Rice (Regular)",
+            "description": "...",
+            "dishPhoto": "storage link",
+            "inStock": true,
+            "price": 5.5,
+            "waitTime": 8
         }
     """
     try:
@@ -102,27 +102,27 @@ def create_order():
                 }
             }
         }
-      Where each stall maps to an array of dish indices (e.g., 0, 2) that refer to the
-      positions of dishes in the menu array returned by the Menu microservice.
+        Where each stall maps to an array of dish indices (e.g., 0, 2) that refer to the
+        positions of dishes in the menu array returned by the Menu microservice.
 
     - Steps:
-      1. Parse the incoming JSON to extract user ID, email, and stalls.
-      2. For each stall, call GET /menu/<hawkerCenter>/<stallName> to retrieve dish data,
-         and sum up the price * quantity (for now, assume quantity=1 for each index).
-      3. Call the Payment microservice (POST /processPayment) with the computed total.
-      4. Update the order status in an in-memory store (pending, success, failed).
-      5. Return the order status to the Customer UI.
+        1. Parse the incoming JSON to extract user ID, email, and stalls.
+        2. For each stall, call GET /menu/<hawkerCenter>/<stallName> to retrieve dish data,
+            and sum up the price * quantity (for now, assume quantity=1 for each index).
+        3. Call the Payment microservice (POST /processPayment) with the computed total.
+        4. Update the order status in an in-memory store (pending, success, failed).
+        5. Return the order status to the Customer UI.
 
     - Data Structures:
-      paymentRequest = {
-          "paymentAmount": float,
-          "orderId": int,
-          "userId": int
-      }
+        paymentRequest = {
+            "paymentAmount": float,
+            "orderId": int,
+            "userId": int
+        }
 
-      paymentResult = {
-          "paymentStatus": "success" or "failed"
-      }
+        paymentResult = {
+            "paymentStatus": "success" or "failed"
+        }
     """
     try:
         order_request = request.get_json()
@@ -250,8 +250,8 @@ def get_order_status(orderId):
     GET /order/status/<orderId>
     Returns the current status of the given order:
     {
-      "orderId": "...",
-      "status": "pending" | "confirmed" | "failed"
+        "orderId": "...",
+        "status": "pending" | "confirmed" | "failed"
     }
     If the order is not found, returns a 404.
     """
