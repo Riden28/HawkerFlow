@@ -17,8 +17,10 @@ services:
     depends_on:
       - rabbitmq
     environment:
-      # These environment variables can be used in your code (e.g., to locate your Firebase key)
-      FIREBASE_SERVICE_ACCOUNT_KEY_PATH: /app/serviceAccount.json
-      FIREBASE_PROJECT_ID: your-project-id
+      MENU_SERVICE_URL: "http://menu_service:5001"
+      PAYMENT_SERVICE_URL: "http://payment_service:5002"
+      QUEUE_SERVICE_URL: "http://queue_service:5003"
+      NOTIF_SERVICE_URL: "http://notif_service:5004"
+      # Optionally set other variables (if needed)
     volumes:
       - .:/app
