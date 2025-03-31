@@ -190,8 +190,7 @@ def create_order():
         #######################################################################
         payment_payload = {
             "paymentAmount": total_payment_amount,
-            "orderId": order_id,
-            "userId": user_id
+            # "token": some_token
         }
 
         payment_status = "failed"  # Default to failed unless Payment says success
