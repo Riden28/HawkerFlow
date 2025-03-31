@@ -83,6 +83,7 @@ def process_order(ch, method, properties, body):
         print(f"Error processing order: {e}")
 
 # Connect to RabbitMQ and start consuming
+connection = pika.BlockingConnection(pika.ConnectionParameters(RABBITMQ_HOST))
 channel = connection.channel()
 
 channel.queue_declare(queue=QUEUE_NAME)

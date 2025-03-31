@@ -51,8 +51,8 @@ def receiveNotification():
         amqp_setup.check_setup()
         
         #queue name 
-        order_completed_queue_name = "QNotif"
-        payment_completed_queue_name = "ONotif"
+        order_completed_queue_name = "Q_notif"
+        payment_completed_queue_name = "O_notif"
 
         # set up a consumer and start to wait for coming messages
         amqp_setup.channel.basic_consume(queue=order_completed_queue_name, on_message_callback=callbackOrderCompletedNotification, auto_ack=True)
