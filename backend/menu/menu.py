@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from flask import Flask, jsonify, abort
+from flask import Flask, jsonify, request
 from google.cloud import firestore
 from google.oauth2 import service_account
 
@@ -81,6 +81,50 @@ def get_dishes_in_stall(hawkername, stallname):
     
     return jsonify(dishes), 200
 
+
+@app.route("/menu/waitTime", methods=["PUT"])
+def update_wait_times():
+    """
+    Updates waitTime for multiple hawker dishes.
+    Expects a JSON payload like:
+    [
+      { 
+          "stallName": "Tian Tian Hainanese Chicken Rice", 
+          "dishName": "Dish1", 
+          "waitTime": 10
+      },
+      { 
+          "stallName": "Another Stall", 
+          "dishName": "Dish2", 
+          "waitTime": 12
+      }
+    ]
+    """
+    payload = request.get_json()
+    if not payload or not isinstance(payload, list):
+        return jsonify({"error": "Payload must be a list of update objects"}), 400
+
+    batch = db.batch()
+    for update in payload:
+        stall_name = update.get("stallName")
+        dish_name = update.get("dishName")
+        wait_time = update.get("waitTime")
+
+        if stall_name is None or dish_name is None or wait_time is None:
+            return jsonify({"error": "Each update must include stallName, dishName, and waitTime"}), 400
+
+        # Assuming the hawker center is known; adjust collection name as needed
+        dish_ref = db.collection("Maxwell Food Centre").document(stall_name).collection("Dishes").document(dish_name)
+        batch.update(dish_ref, {"waitTime": wait_time})
+
+    try:
+        batch.commit()
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    return jsonify({"message": "Wait times updated successfully"}), 200
+
+
 if __name__ == '__main__':
     # Run the Flask app on host 0.0.0.0 and port 5000
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=True)

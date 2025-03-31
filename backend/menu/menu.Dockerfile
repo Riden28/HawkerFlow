@@ -1,17 +1,22 @@
+# Use an official Python runtime as a base image
 FROM python:3.9-slim
 
-# Create a directory for the app
+# Prevent Python from writing pyc files to disk and enable unbuffered logging
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Set the working directory in the container
 WORKDIR /app
 
-# Copy requirements and install
-COPY ../requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy the requirements file and install dependencies
+COPY requirements.txt /app/requirements.txt
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Copy the rest of the application files
-COPY . .
+# Copy the rest of the application code into the container
+COPY . /app
 
-# Expose port 5000 for Flask
+# Expose port 5000 for the Flask app
 EXPOSE 5000
 
-# Run the Flask app
+# Set the default command to run your app
 CMD ["python", "app.py"]

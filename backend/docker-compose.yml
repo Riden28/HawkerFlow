@@ -1,0 +1,24 @@
+version: '3'
+services:
+  menu:
+    build: ./menu
+    ports:
+      - "5001:5000"
+    environment:
+      - FIREBASE_SERVICE_ACCOUNT_KEY_PATH=/run/secrets/firebase_key.json
+      - FIREBASE_PROJECT_ID=my-project
+
+  activityLog:
+    build: ./activityLog
+    ports:
+      - "5002:5000"
+    environment:
+      - SOME_ACTIVITY_LOG_ENV=whatever
+
+  aggregator:
+    build: ./aggregator
+    ports:
+      - "5000:5000"
+    environment:
+      - ACTIVITY_LOG_URL=http://activityLog:5000
+      - MENU_SERVICE_URL=http://menu:5000
