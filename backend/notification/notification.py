@@ -2,7 +2,7 @@
 # import amqp_connection
 import json
 import pika
-import amqp_setup
+from amqp_setup import get_channel
 from dotenv import load_dotenv
 import os
 
@@ -48,17 +48,17 @@ DS from queuemanagement #scenario 2: notify order completed
 # set up the consumer for both payment completed and order completed
 def receiveNotification():
     try:
-        amqp_setup.check_setup()
+        channel = get_channel()
         
         #queue name 
         order_completed_queue_name = "Q_notif"
         payment_completed_queue_name = "O_notif"
 
         # set up a consumer and start to wait for coming messages
-        amqp_setup.channel.basic_consume(queue=order_completed_queue_name, on_message_callback=callbackOrderCompletedNotification, auto_ack=True)
-        amqp_setup.channel.basic_consume(queue=payment_completed_queue_name, on_message_callback=callbackPaymentCompletedNotification, auto_ack=True)
+        channel.basic_consume(queue=order_completed_queue_name, on_message_callback=callbackOrderCompletedNotification, auto_ack=True)
+        channel.basic_consume(queue=payment_completed_queue_name, on_message_callback=callbackPaymentCompletedNotification, auto_ack=True)
 
-        amqp_setup.channel.start_consuming() # an implicit loop waiting to receive messages; 
+        channel.start_consuming() # an implicit loop waiting to receive messages; 
         #it doesn't exit by default. Use Ctrl+C in the command window to terminate it.
         print("Notification_Log: Consuming from queue:",  f'{order_completed_queue_name}')
         print("Notification_Log: Consuming from queue:",  f'{payment_completed_queue_name}')

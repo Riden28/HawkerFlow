@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, abort, request
 from google.cloud import firestore
 from google.oauth2 import service_account
+from amqp_setup import get_channel
 
 # Load environment variables (if using a .env file)
 load_dotenv()
@@ -23,9 +24,6 @@ db = firestore.Client(project=project_id, credentials=cred, database='queue')
 #consume=====================================================================================================================================
 
 #Consuming from RabbitMQ
-RABBITMQ_HOST = 'rabbitmq'  #update
-QUEUE_NAME = 'O_queue'  #update
-
 def process_order(ch, method, properties, body):
     try:
         # Decode the message body
@@ -83,10 +81,11 @@ def process_order(ch, method, properties, body):
         print(f"Error processing order: {e}")
 
 # Connect to RabbitMQ and start consuming
-connection = pika.BlockingConnection(pika.ConnectionParameters(RABBITMQ_HOST))
-channel = connection.channel()
+RABBITMQ_HOST = 'rabbitmq'  #update
+QUEUE_NAME = 'O_queue'  #update
+channel = get_channel()
 
-channel.queue_declare(queue=QUEUE_NAME)
+channel.queue_declare(queue=QUEUE_NAME , durable=True)
 print(f"Listening for orders on queue: {QUEUE_NAME}")
 
 channel.basic_consume(queue=QUEUE_NAME, on_message_callback=process_order, auto_ack=True)
@@ -96,30 +95,25 @@ try:
 except KeyboardInterrupt:
     print("Stopped consuming.")
     channel.stop_consuming()
-    connection.close()
 
 #publisher=====================================================================================================================================
 
 # RabbitMQ config
-RABBITMQ_HOST = 'rabbitmq'  # update this
-REPLY_QUEUE = 'O_queue'  # update this
+EXCHANGE_NAME = 'queue_exchange'
 
 # RabbitMQ publish function
-def publish_message(queue_name: str, message: dict):
+def publish_message(routing_key: str, message: dict):
     try:
-        connection = pika.BlockingConnection(pika.ConnectionParameters(RABBITMQ_HOST))
-        channel = connection.channel()
-        channel.queue_declare(queue=queue_name, durable=True)
         channel.basic_publish(
-            exchange='',
-            routing_key=queue_name,
+            exchange=EXCHANGE_NAME,
+            routing_key=routing_key,
             body=json.dumps(message),
             properties=pika.BasicProperties(delivery_mode=2)
         )
-        connection.close()
-        print(f"Published to {queue_name}: {message}")
+        
+        print(f"Published to {EXCHANGE_NAME}: {message}")
     except Exception as e:
-        print(f"Failed to publish to {queue_name}: {e}")
+        print(f"Failed to publish to {EXCHANGE_NAME}: {e}")
 
 #APIs=====================================================================================================================================
 
@@ -222,6 +216,7 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
         updated_order_data = order_ref.get().to_dict()
 
         #front end code here to update front ended
+        #publish_message(f"{orderId}.customer", customer_data)
 
         #publish order
         if is_order_completed(updated_order_data):
@@ -232,8 +227,8 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
                 "phoneNumber": updated_order_data.get("phoneNumber"),
                 "orderStatus": "completed"
             }
-            publish_message("Notif", notif_data)
-            publish_message("Log", log_data)
+            publish_message(f"{orderId}.notif", notif_data)
+            publish_message(f"{orderId}.log", log_data)
 
             #deletes the order from db
             order_ref.delete()

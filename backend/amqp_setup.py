@@ -93,7 +93,7 @@ create_queue(
     routing_key="*.queue",
 )
 
-def check_setup():
+def get_channel():
     # The shared connection and channel created when the module is imported may be expired, 
     # timed out, disconnected by the broker or a client;
     # - re-establish the connection/channel is they have been closed
@@ -101,9 +101,13 @@ def check_setup():
 
     if not is_connection_open(connection):
         connection = pika.BlockingConnection(pika.ConnectionParameters(host=hostname, port=port, heartbeat=3600, blocked_connection_timeout=3600))
+
     if channel.is_closed:
         channel = connection.channel()
-        channel.exchange_declare(exchange=exchangename, exchange_type=exchangetype, durable=True) ###
+        print("connection established")
+        channel.exchange_declare(exchange=exchangename, exchange_type=exchangetype, durable=True)
+    
+    return channel
 
 
 def is_connection_open(connection):
