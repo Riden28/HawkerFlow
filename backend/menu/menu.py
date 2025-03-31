@@ -82,6 +82,48 @@ def get_dishes_in_stall(hawkername, stallname):
     return jsonify(dishes), 200
 
 
+# @app.route("/menu/waitTime", methods=["PUT"])
+# def update_wait_times():
+#     """
+#     Updates waitTime for multiple hawker dishes.
+#     Expects a JSON payload like:
+#     [
+#       { 
+#           "stallName": "Tian Tian Hainanese Chicken Rice", 
+#           "dishName": "Dish1", 
+#           "waitTime": 10
+#       },
+#       { 
+#           "stallName": "Another Stall", 
+#           "dishName": "Dish2", 
+#           "waitTime": 12
+#       }
+#     ]
+#     """
+#     payload = request.get_json()
+#     if not payload or not isinstance(payload, list):
+#         return jsonify({"error": "Payload must be a list of update objects"}), 400
+
+#     batch = db.batch()
+#     for update in payload:
+#         stall_name = update.get("stallName")
+#         dish_name = update.get("dishName")
+#         wait_time = update.get("waitTime")
+
+#         if stall_name is None or dish_name is None or wait_time is None:
+#             return jsonify({"error": "Each update must include stallName, dishName, and waitTime"}), 400
+
+#         # Assuming the hawker center is known; adjust collection name as needed
+#         dish_ref = db.collection("Maxwell Food Centre").document(stall_name).collection("Dishes").document(dish_name)
+#         batch.update(dish_ref, {"waitTime": wait_time})
+
+#     try:
+#         batch.commit()
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
+
+#     return jsonify({"message": "Wait times updated successfully"}), 200
+
 @app.route("/menu/waitTime", methods=["PUT"])
 def update_wait_times():
     """
@@ -93,37 +135,40 @@ def update_wait_times():
           "dishName": "Dish1", 
           "waitTime": 10
       },
-      { 
-          "stallName": "Another Stall", 
-          "dishName": "Dish2", 
-          "waitTime": 12
-      }
+      ...
     ]
     """
     payload = request.get_json()
     if not payload or not isinstance(payload, list):
         return jsonify({"error": "Payload must be a list of update objects"}), 400
 
+    hawker_centre = "Maxwell Food Centre"  # Optional: make dynamic later
     batch = db.batch()
-    for update in payload:
+    errors = []
+
+    for idx, update in enumerate(payload):
         stall_name = update.get("stallName")
         dish_name = update.get("dishName")
         wait_time = update.get("waitTime")
 
-        if stall_name is None or dish_name is None or wait_time is None:
-            return jsonify({"error": "Each update must include stallName, dishName, and waitTime"}), 400
+        if not all([stall_name, dish_name, wait_time is not None]):
+            errors.append({"index": idx, "error": "Missing stallName, dishName or waitTime"})
+            continue
 
-        # Assuming the hawker center is known; adjust collection name as needed
-        dish_ref = db.collection("Maxwell Food Centre").document(stall_name).collection("Dishes").document(dish_name)
-        batch.update(dish_ref, {"waitTime": wait_time})
+        try:
+            dish_ref = db.collection(hawker_centre).document(stall_name).collection("Dishes").document(dish_name)
+            batch.set(dish_ref, {"waitTime": wait_time}, merge=True)  # Use `set(..., merge=True)` to prevent errors if dish doesn't exist
+        except Exception as e:
+            errors.append({"index": idx, "error": str(e)})
+
+    if errors:
+        return jsonify({"message": "Partial success", "errors": errors}), 207
 
     try:
         batch.commit()
+        return jsonify({"message": "Wait times updated successfully"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-    return jsonify({"message": "Wait times updated successfully"}), 200
-
 
 if __name__ == '__main__':
     # Run the Flask app on host 0.0.0.0 and port 5000
