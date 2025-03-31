@@ -22,7 +22,7 @@ cred = service_account.Credentials.from_service_account_file(service_account_pat
 db = firestore.Client(project=project_id, credentials=cred, database='queue')
 
 # RabbitMQ config
-RABBITMQ_HOST = 'localhost' #changeforDocker
+RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST") #changeforDocker
 EXCHANGE_NAME = 'queue_exchange'
 QUEUE_NAME = 'O_queue'
 connection = pika.BlockingConnection(pika.ConnectionParameters(RABBITMQ_HOST))
