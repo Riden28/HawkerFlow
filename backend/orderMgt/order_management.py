@@ -1,6 +1,8 @@
 import os
 import time
+import json
 import requests
+import pika
 from flask import Flask, request, jsonify
 
 ###############################################################################
@@ -11,45 +13,75 @@ app = Flask(__name__)
 ###############################################################################
 # Environment-Based Configuration
 ###############################################################################
-# These environment variables define the base URLs for the microservices that
-# Order Management will call. In a real deployment these might point to different
-# hostnames or container names.
+# Base URLs for outbound REST calls to other microservices.
 MENU_SERVICE_URL = os.environ.get("MENU_SERVICE_URL", "http://localhost:5001")
 PAYMENT_SERVICE_URL = os.environ.get("PAYMENT_SERVICE_URL", "http://localhost:5002")
+# (Queue and Notification services are now notified via RabbitMQ)
+# You can still set these for other purposes if needed:
 QUEUE_SERVICE_URL = os.environ.get("QUEUE_SERVICE_URL", "http://localhost:5003")
 NOTIF_SERVICE_URL = os.environ.get("NOTIF_SERVICE_URL", "http://localhost:5004")
 
-# In-memory storage of orders for demonstration purposes.
+# RabbitMQ configuration (for asynchronous messaging)
+RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST", "localhost")
+EXCHANGE_NAME = os.environ.get("EXCHANGE_NAME", "queue_exchange")
+# QUEUE_NAME is not used for publishing in this composite service.
+# In our case, we are only publishing messages to the exchange with specific routing keys.
+
+# Initialize RabbitMQ connection and channel
+try:
+    connection = pika.BlockingConnection(pika.ConnectionParameters(host=RABBITMQ_HOST))
+    channel = connection.channel()
+    # Declare a durable topic exchange for routing messages to Queue Management and Notification services
+    channel.exchange_declare(exchange=EXCHANGE_NAME, exchange_type='topic', durable=True)
+    print("RabbitMQ connection established and exchange declared.")
+except Exception as e:
+    print(f"Error setting up RabbitMQ: {e}")
+    channel = None
+
+###############################################################################
+# In-memory storage for orders (for demonstration purposes)
+###############################################################################
 orders = {}
 
 ###############################################################################
-# 1) Composite Endpoints for Menu Data (Proxy Calls to MENU Microservice)
+# Utility function: Asynchronous Publisher via RabbitMQ
+###############################################################################
+def publish_message(routing_key: str, message: dict):
+    """
+    Publishes a JSON message to the RabbitMQ exchange using the provided routing key.
+    This message will be delivered asynchronously to the appropriate microservices.
+    """
+    try:
+        if channel is None:
+            print("RabbitMQ channel is not available.")
+            return
+        channel.basic_publish(
+            exchange=EXCHANGE_NAME,
+            routing_key=routing_key,
+            body=json.dumps(message),
+            properties=pika.BasicProperties(delivery_mode=2)  # Make message persistent
+        )
+        print(f"Published message with routing key '{routing_key}': {message}")
+    except Exception as e:
+        print(f"Failed to publish message: {e}")
+
+###############################################################################
+# 1) Composite Endpoints to Retrieve Stall Lists and Menu Items (Proxy Calls)
 ###############################################################################
 @app.route("/menu/<string:hawkerCenter>", methods=["GET"])
 def get_stalls_for_hawker_center(hawkerCenter):
     """
-    [Exposed to UI]
     GET /menu/<hawkerCenter>
-    
-    This endpoint proxies a request to the MENU microservice to retrieve the list of
-    stalls available at the specified hawker center. The MENU microservice is expected
-    to return a JSON array of stall objects with fields like:
-        - category
-        - description
-        - rating
-        - stallName
-        - stallPhoto
+    Proxies the request to the MENU microservice to retrieve the list of stalls.
+    Outbound API Call: GET /menu/<hawkerCenter> on MENU service.
     """
     try:
-        # Outbound API Call: GET /menu/<hawkerCenter> on MENU microservice.
         url = f"{MENU_SERVICE_URL}/menu/{hawkerCenter}"
         response = requests.get(url, timeout=5)
         if response.status_code == 200:
             return jsonify(response.json()), 200
         else:
-            return jsonify({
-                "error": f"Failed to retrieve stall list from MENU service. Status code: {response.status_code}"
-            }), response.status_code
+            return jsonify({"error": f"Failed to retrieve stall list. Status code: {response.status_code}"}), response.status_code
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -57,86 +89,46 @@ def get_stalls_for_hawker_center(hawkerCenter):
 @app.route("/menu/<string:hawkerCenter>/<string:hawkerStall>", methods=["GET"])
 def get_menu_for_stall(hawkerCenter, hawkerStall):
     """
-    [Exposed to UI]
     GET /menu/<hawkerCenter>/<hawkerStall>
-    
-    This endpoint proxies a request to the MENU microservice to retrieve the menu items
-    (dishes) for a specific stall. The MENU microservice is expected to return a JSON array
-    of dish objects with fields such as:
-        - dishName
-        - description
-        - dishPhoto
-        - inStock
-        - price
-        - waitTime
+    Proxies the request to the MENU microservice to retrieve the dish menu for a specific stall.
+    Outbound API Call: GET /menu/<hawkerCenter>/<hawkerStall> on MENU service.
     """
     try:
-        # Outbound API Call: GET /menu/<hawkerCenter>/<hawkerStall> on MENU microservice.
         url = f"{MENU_SERVICE_URL}/menu/{hawkerCenter}/{hawkerStall}"
         response = requests.get(url, timeout=5)
         if response.status_code == 200:
             return jsonify(response.json()), 200
         else:
-            return jsonify({
-                "error": f"Failed to retrieve stall menu items. Status code: {response.status_code}"
-            }), response.status_code
+            return jsonify({"error": f"Failed to retrieve menu items. Status code: {response.status_code}"}), response.status_code
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 ###############################################################################
-# 2) POST /order - Accept Order from UI and Invoke Payment Microservice
+# 2) POST /order - Accept Orders, Call Payment, and Publish Notifications
 ###############################################################################
 @app.route("/order", methods=["POST"])
 def create_order():
     """
-    [Exposed to UI]
     POST /order
-    
-    This composite endpoint accepts an orderRequest from the Customer UI.
-    Expected orderRequest JSON:
-        {
-            "userId": 123,
-            "email": "jane.doe@example.com",
-            "stalls": {
-                "Tian Tian Hainanese Chicken Rice": {
-                    "dishes": [0, 2]
-                },
-                "Maxwell Fuzhou Oyster Cake": {
-                    "dishes": [0]
-                }
-            }
-        }
-    Explanation:
-      1. The service extracts user details and the stalls/dish indices.
-      2. For each stall, it calls the MENU microservice endpoint
-         GET /menu/<hawkerCenter>/<stallName> to retrieve the list of dishes.
-         (Here we assume hawkerCenter is "Maxwell Food Centre" for simplicity.)
-      3. It then uses the provided dish indices to determine the price of each dish.
-         (For this demo, we assume a quantity of 1 per dish.)
-      4. The total payment amount is computed by summing up the prices.
-      5. An outbound API call is made to the PAYMENT microservice:
-         POST /processPayment with payload:
-            {
-                "paymentAmount": <computed total>,
-                "orderId": "<generated order id>",
-                "userId": 123
-            }
-         The Payment microservice is expected to return a JSON with:
-            { "paymentStatus": "success" } or { "paymentStatus": "failed" }
-      6. The order status is stored in-memory and returned to the UI.
-    
-    Testing with Postman:
-      - Set method to POST.
-      - URL: http://localhost:5555/order
-      - Body (raw JSON):
-          {
-              "userId": 123,
-              "email": "jane.doe@example.com",
-              "stalls": {
-                  "Tian Tian Hainanese Chicken Rice": { "dishes": [0, 2] },
-                  "Maxwell Fuzhou Oyster Cake": { "dishes": [0] }
-              }
+    Accepts an order from the UI. Expected JSON payload:
+      {
+          "userId": 123,
+          "email": "jane.doe@example.com",
+          "stalls": {
+              "Tian Tian Hainanese Chicken Rice": { "dishes": [0, 2] },
+              "Maxwell Fuzhou Oyster Cake": { "dishes": [0] }
           }
+      }
+    Steps:
+      1. Parse order request and generate a unique orderId.
+      2. For each stall, call the MENU microservice (GET /menu/<hawkerCenter>/<stallName>)
+         to retrieve dish data and compute total price (assume quantity = 1 per dish).
+      3. Build a paymentRequest payload and call the PAYMENT microservice (POST /processPayment).
+      4. Update the order status based on the Payment response.
+      5. If payment is successful, asynchronously publish notifications:
+         - To Queue Management (routing key: "<orderId>.queue")
+         - To Notification service (routing key: "<orderId>.notif")
+      6. Return orderStatus to the UI.
     """
     try:
         order_request = request.get_json()
@@ -149,7 +141,7 @@ def create_order():
         if user_id is None or email is None or stalls_dict is None:
             return jsonify({"error": "Missing required fields"}), 400
 
-        # Generate a unique order ID based on current timestamp
+        # Generate a unique order ID using the current timestamp.
         order_id = f"order_{int(time.time())}"
         orders[order_id] = {
             "userId": user_id,
@@ -158,16 +150,13 @@ def create_order():
             "status": "pending"
         }
 
-        # For demonstration, we hardcode the hawkerCenter.
+        # For this demo, we hardcode hawkerCenter.
         hawkerCenter = "Maxwell Food Centre"
 
-        # -----------------------------------------------------------------------------
-        # Compute Payment Amount
-        # -----------------------------------------------------------------------------
+        #######################################################################
+        # Compute Payment Amount by calling the MENU microservice for each stall.
+        #######################################################################
         total_payment_amount = 0.0
-        token = "somedongdongfromfrontend"
-
-        # For each stall in the order, call the MENU microservice to retrieve dish details.
         for stallName, stallData in stalls_dict.items():
             # Outbound API Call: GET /menu/<hawkerCenter>/<stallName> on MENU microservice.
             menu_url = f"{MENU_SERVICE_URL}/menu/{hawkerCenter}/{stallName}"
@@ -179,11 +168,10 @@ def create_order():
 
                 menu_items = menu_response.json()  # List of dish objects
                 dish_indices = stallData.get("dishes", [])
-
-                # For each dish index provided, accumulate the price.
+                # Sum up the price for each dish indicated by its index.
                 for dish_idx in dish_indices:
                     if dish_idx < 0 or dish_idx >= len(menu_items):
-                        continue  # Skip if index out of bounds
+                        continue  # Skip invalid indices.
                     dish_info = menu_items[dish_idx]
                     dish_price = dish_info.get("price", 0.0)
                     total_payment_amount += dish_price
@@ -194,13 +182,13 @@ def create_order():
 
         print(f"Total payment for order {order_id} is {total_payment_amount}")
 
-        # -----------------------------------------------------------------------------
-        # Call PAYMENT Microservice
-        # -----------------------------------------------------------------------------
-        # Build the paymentRequest payload.
+        #######################################################################
+        # Call PAYMENT Microservice to Process Payment
+        #######################################################################
         payment_payload = {
             "paymentAmount": total_payment_amount,
-            "token": token
+            "orderId": order_id,
+            "userId": user_id
         }
         payment_status = "failed"  # Default status
         try:
@@ -213,32 +201,39 @@ def create_order():
         except Exception as e:
             print(f"Error calling PAYMENT microservice: {e}")
 
-        # Update the order status in our in-memory store.
+        # Update the order's status in our in-memory store.
         orders[order_id]["status"] = payment_status
 
-        # -----------------------------------------------------------------------------
-        # (Optional) Notify QUEUE MANAGEMENT and NOTIF Microservices
-        # -----------------------------------------------------------------------------
-        # For a full implementation, you might send a notification message with details like:
-        # order_details = {
-        #     "hawkerCentre": hawkerCenter,
-        #     "orderId": order_id,
-        #     "email": email,
-        #     "userId": user_id,
-        #     "paymentStatus": "paid" if payment_status == "success" else "failed",
-        #     "stalls": { ... }  # Detailed dish info can be added here
-        # }
-        # Then call:
-        # requests.post(f"{QUEUE_SERVICE_URL}/addToQueue", json=order_details)
-        # requests.post(f"{NOTIF_SERVICE_URL}/notify", json={
-        #     "emailID": email,
-        #     "orderId": order_id,
-        #     "paymentStatus": payment_status
-        # })
+        #######################################################################
+        # Publish Notifications via RabbitMQ (Asynchronous Messaging)
+        #######################################################################
+        if payment_status == "success":
+            # Build the order details notification payload.
+            order_details = {
+                "hawkerCentre": hawkerCenter,
+                "orderId": order_id,
+                "email": email,
+                "userId": user_id,
+                "paymentStatus": "paid",
+                "stalls": stalls_dict  # In a full implementation, this might include detailed dish info.
+            }
+            # Publish to Queue Management service using routing key "<orderId>.queue"
+            publish_message(f"{order_id}.queue", order_details)
+            
+            # Build notification payload for the Notification service.
+            notif_data = {
+                "orderId": order_id,
+                "userId": user_id,
+                "email": email,
+                "orderStatus": "completed"
+                # "phoneNumber": ... (if available)
+            }
+            # Publish to Notification service using routing key "<orderId>.notif"
+            publish_message(f"{order_id}.notif", notif_data)
 
-        # -----------------------------------------------------------------------------
-        # Return Response to UI
-        # -----------------------------------------------------------------------------
+        #######################################################################
+        # Return Response to the Customer UI
+        #######################################################################
         return jsonify({
             "orderId": order_id,
             "status": payment_status
@@ -254,16 +249,13 @@ def create_order():
 @app.route("/order/status/<string:orderId>", methods=["GET"])
 def get_order_status(orderId):
     """
-    [Exposed to UI]
     GET /order/status/<orderId>
-    
-    Returns the current status of the specified order from our in-memory store.
+    Returns the current status of the order from the in-memory store.
     Expected response:
         {
             "orderId": "order_1618033988",
-            "status": "pending"  // or "success" or "failed"
+            "status": "pending" | "success" | "failed"
         }
-    If the order is not found, returns a 404.
     """
     order_data = orders.get(orderId)
     if order_data:
@@ -275,8 +267,8 @@ def get_order_status(orderId):
         return jsonify({"error": "Order not found"}), 404
 
 ###############################################################################
-# Main - Run the Service
+# Main - Run the Flask Application
 ###############################################################################
 if __name__ == "__main__":
-    # Run the Flask app on host 0.0.0.0 on port 5555.
+    # Run the Flask app on host 0.0.0.0 and port 5555.
     app.run(host="0.0.0.0", port=5555, debug=True)
