@@ -60,7 +60,8 @@ def process_order(ch, method, properties, body):
             }
 
             for dish_info in data["dishes"]:
-                dish_name = dish_info["dishName"]
+
+                dish_name = dish_info["name"]
                 wait_time = dish_info["waitTime"]
                 quantity = dish_info["quantity"]
                 

@@ -18,25 +18,16 @@ MENU_SERVICE_URL = os.environ.get("MENU_SERVICE_URL", "http://localhost:5001")
 PAYMENT_SERVICE_URL = os.environ.get("PAYMENT_SERVICE_URL", "http://localhost:5002")
 # (Queue and Notification services are now notified via RabbitMQ)
 # You can still set these for other purposes if needed:
-QUEUE_SERVICE_URL = os.environ.get("QUEUE_SERVICE_URL", "http://localhost:5003")
-NOTIF_SERVICE_URL = os.environ.get("NOTIF_SERVICE_URL", "http://localhost:5004")
 
 # RabbitMQ configuration (for asynchronous messaging)
 RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST", "localhost")
-EXCHANGE_NAME = os.environ.get("EXCHANGE_NAME", "queue_exchange")
+EXCHANGE_NAME = 'order_exchange'
 # QUEUE_NAME is not used for publishing in this composite service.
 # In our case, we are only publishing messages to the exchange with specific routing keys.
 
 # Initialize RabbitMQ connection and channel
-try:
-    connection = pika.BlockingConnection(pika.ConnectionParameters(host=RABBITMQ_HOST))
-    channel = connection.channel()
-    # Declare a durable topic exchange for routing messages to Queue Management and Notification services
-    channel.exchange_declare(exchange=EXCHANGE_NAME, exchange_type='topic', durable=True)
-    print("RabbitMQ connection established and exchange declared.")
-except Exception as e:
-    print(f"Error setting up RabbitMQ: {e}")
-    channel = None
+connection = pika.BlockingConnection(pika.ConnectionParameters(host=RABBITMQ_HOST))
+channel = connection.channel()
 
 ###############################################################################
 # In-memory storage for orders (for demonstration purposes)
@@ -59,7 +50,7 @@ def publish_message(routing_key: str, message: dict):
             exchange=EXCHANGE_NAME,
             routing_key=routing_key,
             body=json.dumps(message),
-            properties=pika.BasicProperties(delivery_mode=2)  # Make message persistent
+            properties=pika.BasicProperties(delivery_mode=2)
         )
         print(f"Published message with routing key '{routing_key}': {message}")
     except Exception as e:
@@ -265,6 +256,43 @@ def get_order_status(orderId):
         }), 200
     else:
         return jsonify({"error": "Order not found"}), 404
+
+#Used by Sean to test rabbbitmq 
+# orderDetails = {
+#     "hawkerCentre": "Maxwell Food Centre",
+#     "orderId": "order_010",
+#     "phoneNumber": "+6585220855",
+#     "userId": "user_008",
+#     "paymentStatus": "paid",
+#     "stalls": {
+#         "Maxwell Fuzhou Oyster Cake": {
+#         "dishes": [
+#             {
+#             "name": "Fried Carrot Cake",
+#             "quantity": 1,
+#             "waitTime": 6
+#             }
+#         ]
+#         },
+#         "Tian Tian Hainanese Chicken Rice": {
+#         "dishes": [
+#             {
+#             "name": "Chicken Rice",
+#             "quantity": 2,
+#             "waitTime": 10
+#             },
+#             {
+#             "name": "Iced Tea",
+#             "quantity": 1,
+#             "waitTime": 2
+#             }
+#         ]
+#         }
+#     }
+# }
+# test_order_id = "test_001"
+
+# publish_message(f"{test_order_id}.queue", orderDetails)
 
 ###############################################################################
 # Main - Run the Flask Application
