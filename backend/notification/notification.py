@@ -17,6 +17,9 @@ account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
 auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
 twilio_phone_number = os.environ.get("TWILIO_PHONE_NUMBER")
 
+if not all([account_sid, auth_token, twilio_phone_number]):
+    raise ValueError("Missing Twilio environment variables! Check .env file or system variables.")
+
 #for testing.
 # message_body = "hello world"
 # contact = "+6597730551"
