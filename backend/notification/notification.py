@@ -18,8 +18,8 @@ auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
 twilio_phone_number = os.environ.get("TWILIO_PHONE_NUMBER")
 
 #for testing
-# message_body = "hello world"
-# contact = "+6597730551"
+message_body = "hello world"
+contact = "+6597730551"
 
 client = Client(account_sid, auth_token)
 #end of twilio set up 
@@ -83,17 +83,22 @@ def callbackOrderCompletedNotification(channel, method, properties, body): # req
 def processOrderCompletedNotification(body):
     try:
         data = json.loads(body)
-     
-        if "orderStatus" in data:
-            message_body = data["orderStatus"]
-            contact = data["paymentNumber"]
-            send_sms(contact, message_body)
-            return 
-            
+
+        if "orderStatus" in data and isinstance(data["orderStatus"], str):
+            payment_status = data["orderStatus"].lower()
+            contact = data.get("phoneNumber")  # Use `.get()` to avoid KeyErrors
+
+            if "completed" in payment_status:
+                message_body = "Your orders have been completed."
+                send_sms(contact, message_body)
+                return
+            else:
+                print(f"Unexpected order status: {payment_status}")
+
+    except json.JSONDecodeError:
+        print("Error: Failed to parse JSON.")
     except Exception as e:
-        print("--NOT JSON:", e)
-        print("--DATA:", body)
-    print()
+        print(f"Unexpected error: {e}")
         
 
 #Callback fucntion to keep listening  for notifications from queue management
@@ -105,17 +110,26 @@ def callbackPaymentCompletedNotification(channel, method, properties, body): # r
 def processPaymentCompletedNotification(body):
     try:
         data = json.loads(body)
-     
-        if "paymentStatus" in data:
-            message_body = data["paymentStatus"]
-            contact = data["paymentNumber"]
-            send_sms(contact, message_body)
-            return 
-            
+
+        if "paymentStatus" in data and isinstance(data["paymentStatus"], str):
+            payment_status = data["paymentStatus"].lower()
+            contact = data.get("phoneNumber")  # Use `.get()` to avoid KeyErrors
+
+            if "success" in payment_status:
+                message_body = "Your payment has been received."
+                send_sms(contact, message_body)
+                return
+            elif "failed" in payment_status:
+                message_body = "Your payment has failed."
+                send_sms(contact, message_body)
+                return
+            else:
+                print(f"Unexpected payment status: {payment_status}")
+
+    except json.JSONDecodeError:
+        print("Error: Failed to parse JSON.")
     except Exception as e:
-        print("--NOT JSON:", e)
-        print("--DATA:", body)
-    print()
+        print(f"Unexpected error: {e}")
   
 
 #twilio send sms function for messages from both queues
