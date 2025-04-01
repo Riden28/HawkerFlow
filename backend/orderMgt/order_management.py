@@ -294,13 +294,6 @@ def get_order_status(orderId):
 
 # publish_message(f"{test_order_id}.queue", orderDetails)
 
-notif_data = {
-                "phoneNumber": "+6585220855",
-                "paymentStatus": "completed"
-            }
-            # Publish to Notification service using routing key "<orderId>.notif"
-
-publish_message(f"notif_data.notif", notif_data)
 
 ###############################################################################
 # Main - Run the Flask Application

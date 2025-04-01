@@ -253,9 +253,6 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
         time.sleep(1)
         updated_order_data = order_ref.get().to_dict()
 
-        #front end code here to update front ended
-        #publish_message(f"{orderId}.customer", customer_data)
-
         #publish order
         if is_order_completed(updated_order_data):
             
@@ -268,6 +265,9 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
             }
             publish_message(f"{orderId}.notif", notif_data)
             publish_message(f"{orderId}.log", log_data)
+
+            #front end code here to update front ended
+            #publish_message(f"{orderId}.customer", customer_data)
 
             #deletes the order from db
             order_ref.delete()
@@ -287,7 +287,7 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
         return {"error": "Internal server error"}, 500
 
 if __name__ == '__main__':
-    # if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
-    threading.Thread(target=start_rabbitmq_consumer, daemon=True).start()
-    # Start Flask app in the main thread
-    app.run(debug=True, port=5000)
+    if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+        threading.Thread(target=start_rabbitmq_consumer, daemon=True).start()
+
+    app.run(debug=True, port=5000, use_reloader=False)
