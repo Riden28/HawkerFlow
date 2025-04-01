@@ -17,7 +17,7 @@ account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
 auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
 twilio_phone_number = os.environ.get("TWILIO_PHONE_NUMBER")
 
-#for testing
+#for testing.
 # message_body = "hello world"
 # contact = "+6597730551"
 
@@ -84,8 +84,8 @@ def processOrderCompletedNotification(body):
     try:
         data = json.loads(body)
 
-        if "orderStatus" in data and isinstance(data["orderStatus"], str):
-            payment_status = data["orderStatus"].lower()
+        if "orderStatus" in data :
+            payment_status = data["orderStatus"]
             contact = data.get("phoneNumber")  # Use `.get()` to avoid KeyErrors
 
             if "completed" in payment_status:
@@ -111,8 +111,8 @@ def processPaymentCompletedNotification(body):
     try:
         data = json.loads(body)
 
-        if "paymentStatus" in data and isinstance(data["paymentStatus"], str):
-            payment_status = data["paymentStatus"].lower()
+        if "paymentStatus" in data:
+            payment_status = data["paymentStatus"]
             contact = data.get("phoneNumber")  # Use `.get()` to avoid KeyErrors
 
             if "success" in payment_status:
