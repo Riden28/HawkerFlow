@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, CreditCard, QrCode, Banknote } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -44,12 +44,39 @@ function CardForm({ onSubmit }: { onSubmit: (token: string) => void }) {
   const elements = useElements()
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isCardValid, setIsCardValid] = useState(false)
+
+  useEffect(() => {
+    if (!elements) return
+
+    const cardElement = elements.getElement(CardElement)
+    if (!cardElement) return
+
+    const handleChange = (event: any) => {
+      setIsCardValid(event.complete)
+      if (event.error) {
+        setError(event.error.message)
+      } else {
+        setError(null)
+      }
+    }
+
+    cardElement.on('change', handleChange)
+    return () => {
+      cardElement.off('change', handleChange)
+    }
+  }, [elements])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!stripe || !elements) {
       setError("Stripe not initialized")
+      return
+    }
+
+    if (!isCardValid) {
+      setError("Please enter valid card details")
       return
     }
 
@@ -101,7 +128,7 @@ function CardForm({ onSubmit }: { onSubmit: (token: string) => void }) {
       <Button
         type="submit"
         className="w-full"
-        disabled={!stripe || !elements || isProcessing}
+        disabled={!stripe || !elements || isProcessing || !isCardValid}
       >
         {isProcessing ? "Processing..." : "Submit Card Details"}
       </Button>
@@ -118,6 +145,7 @@ export default function PaymentPage() {
   const [error, setError] = useState<string | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<"card" | "qr" | "cash">("card")
   const [cardToken, setCardToken] = useState<string | null>(null)
+  const [isCardValid, setIsCardValid] = useState(false)
 
   const handleBack = () => {
     router.back()
@@ -125,6 +153,7 @@ export default function PaymentPage() {
 
   const handleCardSubmit = (token: string) => {
     setCardToken(token)
+    setIsCardValid(true)
     toast.success("Card details verified!")
   }
 
@@ -144,8 +173,8 @@ export default function PaymentPage() {
 
     try {
       if (paymentMethod === "card") {
-        // Send payment details to order management
-        const response = await fetch("/api/order-management/process-payment", {
+        // Create a payment intent
+        const paymentResponse = await fetch("/api/order-management/process-payment", {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -160,33 +189,19 @@ export default function PaymentPage() {
           })
         })
 
-        const data = await response.json()
-
-        if (!response.ok) {
-          switch (response.status) {
-            case 400:
-              if (data.code === 'card_declined') {
-                throw new Error("Your card was declined. Please try another card.")
-              } else if (data.code === 'insufficient_funds') {
-                throw new Error("Insufficient funds in your card. Please try another card.")
-              } else if (data.code === 'invalid_card') {
-                throw new Error("Invalid card details. Please check and try again.")
-              } else {
-                throw new Error(data.message || "Payment failed. Please try again.")
-              }
-            case 500:
-              throw new Error("An internal error occurred. Please try again later.")
-            default:
-              throw new Error("Payment failed. Please try again.")
-          }
+        if (!paymentResponse.ok) {
+          const errorData = await paymentResponse.json()
+          throw new Error(errorData.message || "Payment failed")
         }
+
+        const data = await paymentResponse.json()
 
         // Payment successful
         toast.success("Payment successful!")
         
         // Create order in localStorage
         const order = {
-          id: data.orderId || `ORD-${Date.now()}`,
+          id: data.orderId,
           items: cart.items,
           total: calculateTotal(),
           email,
@@ -389,7 +404,7 @@ export default function PaymentPage() {
                   <Button
                     className="w-full"
                     onClick={handlePayment}
-                    disabled={isProcessing}
+                    disabled={isProcessing || (paymentMethod === "card" && !isCardValid)}
                   >
                     {isProcessing ? "Processing..." : `Pay ${paymentMethod === "cash" ? "Later" : "Now"}`}
                   </Button>
