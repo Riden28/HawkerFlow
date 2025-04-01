@@ -2,7 +2,6 @@
 # import amqp_connection
 import json
 import pika
-from amqp_setup import get_channel
 from dotenv import load_dotenv
 import os
 
@@ -43,16 +42,17 @@ DS from queuemanagement #scenario 2: notify order completed
     "paymentNumber":"+65xxxxxxxx"
 }
 """
+RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST")
+connection = pika.BlockingConnection(pika.ConnectionParameters(RABBITMQ_HOST))
+channel = connection.channel()
 
+#queue name 
+order_completed_queue_name = "Q_notif"
+payment_completed_queue_name = "O_notif"
 
 # set up the consumer for both payment completed and order completed
 def receiveNotification():
     try:
-        channel = get_channel()
-        
-        #queue name 
-        order_completed_queue_name = "Q_notif"
-        payment_completed_queue_name = "O_notif"
 
         # set up a consumer and start to wait for coming messages
         channel.basic_consume(queue=order_completed_queue_name, on_message_callback=callbackOrderCompletedNotification, auto_ack=True)

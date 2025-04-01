@@ -215,8 +215,8 @@ def create_order():
             notif_data = {
                 "orderId": order_id,
                 "userId": user_id,
-                "email": email,
-                "orderStatus": "completed"
+                "phoneNumber": email,
+                "paymentStatus": "completed"
                 # "phoneNumber": ... (if available)
             }
             # Publish to Notification service using routing key "<orderId>.notif"
@@ -293,6 +293,14 @@ def get_order_status(orderId):
 # test_order_id = "test_001"
 
 # publish_message(f"{test_order_id}.queue", orderDetails)
+
+notif_data = {
+                "phoneNumber": "+6585220855",
+                "paymentStatus": "completed"
+            }
+            # Publish to Notification service using routing key "<orderId>.notif"
+
+publish_message(f"notif_data.notif", notif_data)
 
 ###############################################################################
 # Main - Run the Flask Application
