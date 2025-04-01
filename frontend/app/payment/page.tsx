@@ -12,6 +12,102 @@ import { Label } from "@/components/ui/label"
 import { useCart } from "@/contexts/cart-context"
 import { Navbar } from "@/components/navbar"
 import { toast } from "sonner"
+import { loadStripe } from "@stripe/stripe-js"
+import { Elements, PaymentElement, useStripe, useElements, CardElement } from "@stripe/react-stripe-js"
+
+// Initialize Stripe with error handling
+const stripePromise = (() => {
+  const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+  if (!key) {
+    console.error("Stripe publishable key is missing. Please check your environment variables.")
+    return null
+  }
+  return loadStripe(key)
+})()
+
+const appearance = {
+  theme: 'stripe',
+  variables: {
+    colorPrimary: '#0F172A',
+    colorBackground: '#ffffff',
+    colorText: '#0F172A',
+    colorDanger: '#df1b41',
+    fontFamily: 'system-ui, sans-serif',
+    spacingUnit: '4px',
+    borderRadius: '8px',
+  },
+} as const
+
+// Stripe card component
+function CardForm({ onSubmit }: { onSubmit: (token: string) => void }) {
+  const stripe = useStripe()
+  const elements = useElements()
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!stripe || !elements) {
+      setError("Stripe not initialized")
+      return
+    }
+
+    setIsProcessing(true)
+    setError(null)
+
+    try {
+      const cardElement = elements.getElement(CardElement)
+      if (!cardElement) {
+        throw new Error("Card element not found")
+      }
+
+      const {token, error: tokenError} = await stripe.createToken(cardElement)
+      
+      if (tokenError) {
+        throw tokenError
+      }
+
+      onSubmit(token.id)
+    } catch (err: any) {
+      setError(err.message || "Payment failed")
+      toast.error(err.message || "Payment failed")
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="border rounded-lg p-4">
+        <CardElement 
+          options={{
+            style: {
+              base: {
+                fontSize: '16px',
+                color: '#0F172A',
+                '::placeholder': {
+                  color: '#6B7280',
+                },
+              },
+              invalid: {
+                color: '#EF4444',
+              },
+            },
+          }}
+        />
+      </div>
+      {error && <div className="text-red-500 text-sm">{error}</div>}
+      <Button
+        type="submit"
+        className="w-full"
+        disabled={!stripe || !elements || isProcessing}
+      >
+        {isProcessing ? "Processing..." : "Submit Card Details"}
+      </Button>
+    </form>
+  )
+}
 
 export default function PaymentPage() {
   const router = useRouter()
@@ -21,15 +117,15 @@ export default function PaymentPage() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<"card" | "qr" | "cash">("card")
-  
-  // Credit card form state
-  const [cardNumber, setCardNumber] = useState("")
-  const [expiryDate, setExpiryDate] = useState("")
-  const [cvv, setCvv] = useState("")
-  const [cardName, setCardName] = useState("")
+  const [cardToken, setCardToken] = useState<string | null>(null)
 
   const handleBack = () => {
     router.back()
+  }
+
+  const handleCardSubmit = (token: string) => {
+    setCardToken(token)
+    toast.success("Card details verified!")
   }
 
   const handlePayment = async () => {
@@ -38,46 +134,99 @@ export default function PaymentPage() {
       return
     }
 
-    if (paymentMethod === "card") {
-      if (!cardNumber || !expiryDate || !cvv || !cardName) {
-        setError("Please fill in all card details")
-        return
-      }
+    if (paymentMethod === "card" && !cardToken) {
+      setError("Please complete card payment first")
+      return
     }
 
     setIsProcessing(true)
     setError(null)
 
     try {
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      if (paymentMethod === "card") {
+        // Send payment details to order management
+        const response = await fetch("/api/order-management/process-payment", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            token: cardToken,
+            amount: calculateTotal(),
+            email,
+            items: cart.items,
+            specialInstructions,
+            paymentMethod
+          })
+        })
 
-      // Create order in localStorage
-      const order = {
-        id: `ORD-${Date.now()}`,
-        items: cart.items,
-        total: calculateTotal(),
-        email,
-        specialInstructions,
-        paymentMethod,
-        status: "completed",
-        createdAt: new Date().toISOString()
+        const data = await response.json()
+
+        if (!response.ok) {
+          switch (response.status) {
+            case 400:
+              if (data.code === 'card_declined') {
+                throw new Error("Your card was declined. Please try another card.")
+              } else if (data.code === 'insufficient_funds') {
+                throw new Error("Insufficient funds in your card. Please try another card.")
+              } else if (data.code === 'invalid_card') {
+                throw new Error("Invalid card details. Please check and try again.")
+              } else {
+                throw new Error(data.message || "Payment failed. Please try again.")
+              }
+            case 500:
+              throw new Error("An internal error occurred. Please try again later.")
+            default:
+              throw new Error("Payment failed. Please try again.")
+          }
+        }
+
+        // Payment successful
+        toast.success("Payment successful!")
+        
+        // Create order in localStorage
+        const order = {
+          id: data.orderId || `ORD-${Date.now()}`,
+          items: cart.items,
+          total: calculateTotal(),
+          email,
+          specialInstructions,
+          paymentMethod,
+          status: "completed",
+          createdAt: new Date().toISOString()
+        }
+
+        const existingOrders = JSON.parse(localStorage.getItem("orders") || "[]")
+        localStorage.setItem("orders", JSON.stringify([...existingOrders, order]))
+
+        clearCart()
+        router.push(`/queue?orderId=${order.id}`)
+      } else {
+        // Handle QR and cash payments (existing logic)
+        await new Promise(resolve => setTimeout(resolve, 2000))
+
+        const order = {
+          id: `ORD-${Date.now()}`,
+          items: cart.items,
+          total: calculateTotal(),
+          email,
+          specialInstructions,
+          paymentMethod,
+          status: "completed",
+          createdAt: new Date().toISOString()
+        }
+
+        const existingOrders = JSON.parse(localStorage.getItem("orders") || "[]")
+        localStorage.setItem("orders", JSON.stringify([...existingOrders, order]))
+
+        clearCart()
+        toast.success("Order placed successfully!")
+        router.push(`/queue?orderId=${order.id}`)
       }
-
-      // Get existing orders or initialize empty array
-      const existingOrders = JSON.parse(localStorage.getItem("orders") || "[]")
-      localStorage.setItem("orders", JSON.stringify([...existingOrders, order]))
-
-      // Clear cart
-      clearCart()
-
-      // Show success message
-      toast.success("Order placed successfully!")
-
-      // Redirect to success page
-      router.push("/orders")
     } catch (err) {
-      setError("Payment failed. Please try again.")
+      console.error("Payment error:", err)
+      setError(err instanceof Error ? err.message : "Payment failed. Please try again.")
+      toast.error(err instanceof Error ? err.message : "Payment failed. Please try again.")
     } finally {
       setIsProcessing(false)
     }
@@ -86,55 +235,17 @@ export default function PaymentPage() {
   const renderPaymentForm = () => {
     switch (paymentMethod) {
       case "card":
+        if (!stripePromise) {
+          return (
+            <div className="p-4 text-red-500">
+              Card payment is currently unavailable. Please try another payment method.
+            </div>
+          )
+        }
         return (
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="card-number">Card Number</Label>
-              <Input
-                id="card-number"
-                placeholder="1234 5678 9012 3456"
-                value={cardNumber}
-                onChange={(e) => setCardNumber(e.target.value)}
-                maxLength={19}
-                required
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="expiry">Expiry Date</Label>
-                <Input
-                  id="expiry"
-                  placeholder="MM/YY"
-                  value={expiryDate}
-                  onChange={(e) => setExpiryDate(e.target.value)}
-                  maxLength={5}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="cvv">CVV</Label>
-                <Input
-                  id="cvv"
-                  type="password"
-                  placeholder="123"
-                  value={cvv}
-                  onChange={(e) => setCvv(e.target.value)}
-                  maxLength={4}
-                  required
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="card-name">Name on Card</Label>
-              <Input
-                id="card-name"
-                placeholder="John Doe"
-                value={cardName}
-                onChange={(e) => setCardName(e.target.value)}
-                required
-              />
-            </div>
-          </div>
+          <Elements stripe={stripePromise} options={{ appearance }}>
+            <CardForm onSubmit={handleCardSubmit} />
+          </Elements>
         )
       case "qr":
         return (
@@ -348,4 +459,3 @@ export default function PaymentPage() {
     </div>
   )
 }
-
