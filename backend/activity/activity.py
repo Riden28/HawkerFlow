@@ -10,12 +10,12 @@ from google.cloud import firestore
 from google.oauth2 import service_account
 
 # Load .env from root (../../.env)
-load_dotenv(dotenv_path=Path(__file__).resolve().parents[2] / ".env")
+load_dotenv()
 
 # Firebase credentials
-service_account_path = os.environ["FIREBASE_SERVICE_ACCOUNT_KEY_PATH"]
-project_id = os.environ["FIREBASE_PROJECT_ID"]
-database_id = os.environ["FIREBASE_DB_NAME"]
+service_account_path = os.environ.get("FIREBASE_SERVICE_ACCOUNT_KEY_PATH")
+project_id = os.environ.get("FIREBASE_PROJECT_ID")
+database_id = "activity"
 
 cred = service_account.Credentials.from_service_account_file(service_account_path)
 db = firestore.Client(project=project_id, credentials=cred, database=database_id)
