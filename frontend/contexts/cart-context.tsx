@@ -1,207 +1,169 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, type ReactNode, useMemo } from "react"
+import { createContext, useContext, useState, useEffect, ReactNode } from "react"
 
 // Define types for our cart items
-export type CartItem = {
-  id: number
+interface CartItem {
+  id: string
   name: string
   price: number
   quantity: number
-  image: string
-  stallId: number
   stallName: string
-  hawkerCenterId: number
   hawkerCenterName: string
   waitTime: string
   prepTime: string
-  options?: {
+  image?: string
+  options?: Array<{
     name: string
-    choice: string
     price: number
-  }[]
+    choice: string
+  }>
   specialInstructions?: string
 }
 
-type CartContextType = {
-  items: CartItem[]
+interface CartContextType {
+  cart: {
+    items: CartItem[]
+  }
   addItem: (item: CartItem) => void
-  removeItem: (id: number) => void
-  updateQuantity: (id: number, quantity: number) => void
+  removeItem: (itemId: string) => void
+  updateQuantity: (itemId: string, quantity: number) => void
   clearCart: () => void
   getTotalItems: () => number
   getSubtotal: () => number
-  getMaxWaitTime: () => { minutes: number; stallName: string }
+  getMaxWaitTime: () => { minutes: number }
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined)
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  // Initialize cart from localStorage if available
-  const [items, setItems] = useState<CartItem[]>([])
+  const [cart, setCart] = useState<{ items: CartItem[] }>({ items: [] })
 
   // Load cart from localStorage on initial render
   useEffect(() => {
     try {
       const savedCart = localStorage.getItem("cart")
       if (savedCart) {
-        setItems(JSON.parse(savedCart))
+        const parsedCart = JSON.parse(savedCart)
+        setCart({ items: parsedCart.items || [] })
       }
     } catch (e) {
-      console.error("Failed to parse cart from localStorage", e)
-      // Don't set the error directly in state or render it
+      console.error("Failed to load cart from localStorage", e)
+      setCart({ items: [] })
     }
   }, [])
 
   // Save cart to localStorage whenever it changes
   useEffect(() => {
     try {
-      localStorage.setItem("cart", JSON.stringify(items))
+      localStorage.setItem("cart", JSON.stringify(cart))
     } catch (e) {
       console.error("Failed to save cart to localStorage", e)
-      // Don't set the error directly in state or render it
     }
-  }, [items])
+  }, [cart])
 
-  const addItem = (newItem: CartItem) => {
-    try {
-      setItems((prevItems) => {
-        // Check if item already exists in cart
-        const existingItemIndex = prevItems.findIndex(
-          (item) => item.id === newItem.id && JSON.stringify(item.options) === JSON.stringify(newItem.options),
-        )
+  const addItem = (item: CartItem) => {
+    setCart((prevCart) => {
+      // Create a unique key for the item based on its ID and options
+      const getItemKey = (cartItem: CartItem) => {
+        const optionsKey = cartItem.options
+          ? cartItem.options
+              .map(opt => `${opt.name}:${opt.choice}:${opt.price}`)
+              .sort()
+              .join('|')
+          : '';
+        return `${cartItem.id}-${optionsKey}-${cartItem.specialInstructions || ''}`;
+      };
 
-        if (existingItemIndex >= 0) {
-          // Update quantity if item exists
-          const updatedItems = [...prevItems]
-          updatedItems[existingItemIndex].quantity += newItem.quantity
-          return updatedItems
-        } else {
-          // Add new item
-          return [...prevItems, newItem]
+      const itemKey = getItemKey(item);
+      const existingItem = prevCart.items.find((i) => getItemKey(i) === itemKey);
+
+      if (existingItem) {
+        return {
+          items: prevCart.items.map((i) =>
+            getItemKey(i) === itemKey ? { ...i, quantity: i.quantity + item.quantity } : i
+          ),
         }
-      })
-    } catch (e) {
-      console.error("Failed to add item to cart", e)
-      // Don't set the error directly in state or render it
-      throw new Error("Failed to add item to cart")
-    }
+      }
+      return {
+        items: [...prevCart.items, { ...item }],
+      }
+    })
   }
 
-  const removeItem = (id: number) => {
-    try {
-      setItems((prevItems) => prevItems.filter((item) => item.id !== id))
-    } catch (e) {
-      console.error("Failed to remove item from cart", e)
-      // Don't set the error directly in state or render it
-    }
+  const removeItem = (itemId: string) => {
+    setCart((prevCart) => ({
+      items: prevCart.items.filter((item) => item.id !== itemId),
+    }))
   }
 
-  const updateQuantity = (id: number, quantity: number) => {
-    try {
-      if (quantity < 1) return
-
-      setItems((prevItems) => prevItems.map((item) => (item.id === id ? { ...item, quantity } : item)))
-    } catch (e) {
-      console.error("Failed to update item quantity", e)
-      // Don't set the error directly in state or render it
+  const updateQuantity = (itemId: string, quantity: number) => {
+    if (quantity < 1) {
+      removeItem(itemId)
+      return
     }
+    setCart((prevCart) => ({
+      items: prevCart.items.map((item) =>
+        item.id === itemId ? { ...item, quantity } : item
+      ),
+    }))
   }
 
   const clearCart = () => {
-    try {
-      setItems([])
-    } catch (e) {
-      console.error("Failed to clear cart", e)
-      // Don't set the error directly in state or render it
-    }
+    setCart({ items: [] })
   }
 
   const getTotalItems = () => {
-    try {
-      return items.reduce((total, item) => total + item.quantity, 0)
-    } catch (e) {
-      console.error("Failed to calculate total items", e)
-      return 0
-    }
+    return cart.items.reduce((total, item) => total + item.quantity, 0)
   }
 
   const getSubtotal = () => {
-    try {
-      return items.reduce((total, item) => {
-        const itemTotal = item.price * item.quantity
-        const optionsTotal = item.options?.reduce((sum, option) => sum + option.price, 0) || 0
-        return total + (itemTotal + optionsTotal * item.quantity)
-      }, 0)
-    } catch (e) {
-      console.error("Failed to calculate subtotal", e)
-      return 0
-    }
+    return cart.items.reduce((total, item) => {
+      const itemTotal = item.price * item.quantity
+      const optionsTotal = item.options?.reduce((sum, option) => sum + option.price, 0) || 0
+      return total + (itemTotal + optionsTotal * item.quantity)
+    }, 0)
   }
 
-  // Calculate the maximum wait time from all items in cart
   const getMaxWaitTime = () => {
-    try {
-      if (items.length === 0) {
-        return {
-          minutes: 0,
-          stallName: "",
-        }
-      }
-
-      let maxMinutes = 0
-      let maxStallName = ""
-
-      items.forEach((item) => {
-        // Safely handle wait time and prep time parsing
-        try {
-          const queueRange = item.waitTime.split("-")
-          const prepRange = item.prepTime.split("-")
-
-          const maxQueueTime = Number.parseInt(queueRange[1] || queueRange[0] || "0")
-          const maxPrepTime = Number.parseInt(prepRange[1] || prepRange[0] || "0")
-
-          const totalTime = maxQueueTime + maxPrepTime
-
-          if (totalTime > maxMinutes) {
-            maxMinutes = totalTime
-            maxStallName = item.stallName
-          }
-        } catch (parseError) {
-          console.error("Error parsing time for item", item.name, parseError)
-          // Skip this item if there's a parsing error
-        }
-      })
-
-      return {
-        minutes: maxMinutes,
-        stallName: maxStallName,
-      }
-    } catch (e) {
-      console.error("Failed to calculate max wait time", e)
-      return {
-        minutes: 0,
-        stallName: "",
-      }
+    if (cart.items.length === 0) {
+      return { minutes: 0 }
     }
+
+    let maxMinutes = 0
+    let maxStallName = ""
+
+    cart.items.forEach((item) => {
+      // Parse wait time and prep time
+      const waitMinutes = parseInt(item.waitTime) || 0
+      const prepMinutes = parseInt(item.prepTime) || 0
+      const totalMinutes = waitMinutes + prepMinutes
+
+      if (totalMinutes > maxMinutes) {
+        maxMinutes = totalMinutes
+        maxStallName = item.stallName
+      }
+    })
+
+    return { minutes: maxMinutes }
   }
 
-  // Use useMemo to avoid recalculating these values on every render
-  const memoizedValue = useMemo(
-    () => ({
-      items,
-      addItem,
-      removeItem,
-      updateQuantity,
-      clearCart,
-      getTotalItems,
-      getSubtotal,
-      getMaxWaitTime,
-    }),
-    [items],
+  return (
+    <CartContext.Provider
+      value={{
+        cart,
+        addItem,
+        removeItem,
+        updateQuantity,
+        clearCart,
+        getTotalItems,
+        getSubtotal,
+        getMaxWaitTime,
+      }}
+    >
+      {children}
+    </CartContext.Provider>
   )
-
-  return <CartContext.Provider value={memoizedValue}>{children}</CartContext.Provider>
 }
 
 export function useCart() {

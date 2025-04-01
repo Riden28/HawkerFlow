@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Clock, CheckCircle, XCircle, ArrowRight, ArrowLeft } from "lucide-react"
@@ -12,97 +12,33 @@ import { Separator } from "@/components/ui/separator"
 import { Progress } from "@/components/ui/progress"
 import { Navbar } from "@/components/navbar"
 
-// Sample order data
-const orders = [
-  {
-    id: "HWK-1234",
-    date: "2023-06-15T14:30:00",
-    status: "ready",
-    total: 15.17,
-    items: [
-      {
-        name: "Chicken Rice",
-        quantity: 1,
-        price: 5.5,
-        stallName: "Tian Tian Hainanese Chicken Rice",
-        hawkerCenter: "Maxwell Food Centre",
-      },
-      {
-        name: "Char Kway Teow",
-        quantity: 2,
-        price: 5.0,
-        stallName: "Maxwell Fuzhou Oyster Cake",
-        hawkerCenter: "Maxwell Food Centre",
-      },
-      {
-        name: "Teh Tarik",
-        quantity: 1,
-        price: 1.8,
-        stallName: "Sweet Desserts",
-        hawkerCenter: "Maxwell Food Centre",
-      },
-    ],
-    hawkerCenter: "Maxwell Food Centre",
-    paymentMethod: "Credit Card",
-    estimatedTime: 35,
-    elapsedTime: 20,
-    readyTime: "15:05",
-  },
-  {
-    id: "HWK-1122",
-    date: "2023-06-10T12:15:00",
-    status: "completed",
-    total: 9.5,
-    items: [
-      {
-        name: "Laksa",
-        quantity: 1,
-        price: 6.0,
-        stallName: "Famous Sungei Road Laksa",
-        hawkerCenter: "Old Airport Road Food Centre",
-      },
-      {
-        name: "Ice Kachang",
-        quantity: 1,
-        price: 3.5,
-        stallName: "Lao Ban Soya Beancurd",
-        hawkerCenter: "Old Airport Road Food Centre",
-      },
-    ],
-    hawkerCenter: "Old Airport Road Food Centre",
-    paymentMethod: "PayNow",
-    estimatedTime: 30,
-    elapsedTime: 30,
-    readyTime: "12:45",
-  },
-  {
-    id: "HWK-1001",
-    date: "2023-06-05T18:45:00",
-    status: "cancelled",
-    total: 8.0,
-    items: [
-      {
-        name: "Chicken Chop",
-        quantity: 1,
-        price: 8.0,
-        stallName: "Western Delights",
-        hawkerCenter: "Maxwell Food Centre",
-      },
-    ],
-    hawkerCenter: "Maxwell Food Centre",
-    paymentMethod: "Cash",
-    estimatedTime: 25,
-    elapsedTime: 0,
-    readyTime: "N/A",
-  },
-]
-
 export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState("all")
+  const [orders, setOrders] = useState([])
   const router = useRouter()
 
+  // Load orders from localStorage when component mounts
+  useEffect(() => {
+    const loadOrders = () => {
+      try {
+        const savedOrders = JSON.parse(localStorage.getItem("orders") || "[]")
+        setOrders(savedOrders)
+      } catch (error) {
+        console.error("Error loading orders:", error)
+        setOrders([])
+      }
+    }
+
+    loadOrders()
+    // Set up an interval to check for new orders every 30 seconds
+    const interval = setInterval(loadOrders, 30000)
+
+    return () => clearInterval(interval)
+  }, [])
+
   const getStatusBadge = (status: string) => {
-    switch (status) {
+    switch (status.toLowerCase()) {
+      case "paid":
       case "ready":
         return <Badge className="bg-green-500">Ready for Pickup</Badge>
       case "completed":
@@ -119,7 +55,8 @@ export default function OrdersPage() {
   }
 
   const getStatusIcon = (status: string) => {
-    switch (status) {
+    switch (status.toLowerCase()) {
+      case "paid":
       case "ready":
         return <Clock className="h-8 w-8 text-green-500" />
       case "completed":
@@ -135,7 +72,9 @@ export default function OrdersPage() {
     router.back()
   }
 
-  const filteredOrders = activeTab === "all" ? orders : orders.filter((order) => order.status === activeTab)
+  const filteredOrders = activeTab === "all" 
+    ? orders 
+    : orders.filter((order) => order.status.toLowerCase() === activeTab)
 
   return (
     <div className="min-h-screen bg-background">
@@ -153,7 +92,7 @@ export default function OrdersPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
           <TabsList>
             <TabsTrigger value="all">All Orders</TabsTrigger>
-            <TabsTrigger value="ready">Ready for Pickup</TabsTrigger>
+            <TabsTrigger value="paid">Ready for Pickup</TabsTrigger>
             <TabsTrigger value="completed">Completed</TabsTrigger>
             <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
           </TabsList>
@@ -171,14 +110,14 @@ export default function OrdersPage() {
             ) : (
               <div className="space-y-6">
                 {filteredOrders.map((order) => (
-                  <Card key={order.id}>
+                  <Card key={order.orderId}>
                     <CardHeader>
                       <div className="flex justify-between items-start">
                         <div>
-                          <CardTitle>Order #{order.id}</CardTitle>
+                          <CardTitle>Order #{order.orderId}</CardTitle>
                           <CardDescription>
-                            {new Date(order.date).toLocaleDateString()} at{" "}
-                            {new Date(order.date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            {new Date(order.timestamp).toLocaleDateString()} at{" "}
+                            {new Date(order.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                           </CardDescription>
                         </div>
                         {getStatusBadge(order.status)}
@@ -195,10 +134,15 @@ export default function OrdersPage() {
                                   <span>
                                     {item.quantity}x {item.name}
                                   </span>
-                                  <span>${(item.price * item.quantity).toFixed(2)}</span>
+                                  <span>
+                                    ${(
+                                      (item.price + (item.options?.reduce((sum, opt) => sum + opt.price, 0) || 0)) *
+                                      item.quantity
+                                    ).toFixed(2)}
+                                  </span>
                                 </div>
                                 <div className="text-xs text-muted-foreground">
-                                  {item.stallName}, {item.hawkerCenter}
+                                  {item.stallName}, {item.hawkerCenterName}
                                 </div>
                               </div>
                             ))}
@@ -212,7 +156,7 @@ export default function OrdersPage() {
                         <div className="flex flex-col items-center justify-center bg-muted p-4 rounded-lg">
                           {getStatusIcon(order.status)}
                           <h3 className="font-medium mt-2">
-                            {order.status === "ready"
+                            {order.status === "paid"
                               ? "Ready for Pickup"
                               : order.status === "completed"
                                 ? "Order Completed"
@@ -221,29 +165,17 @@ export default function OrdersPage() {
                                   : "Processing"}
                           </h3>
                           <p className="text-sm text-muted-foreground text-center mt-1">
-                            {order.status === "ready"
-                              ? `Ready at ${order.readyTime}`
+                            {order.status === "paid"
+                              ? "Your order is ready for pickup"
                               : order.status === "completed"
                                 ? "Order was picked up successfully"
                                 : order.status === "cancelled"
                                   ? "This order was cancelled"
                                   : "Your order is being prepared"}
                           </p>
-
-                          {order.status === "ready" && (
-                            <div className="w-full mt-4">
-                              <p className="text-xs text-center mb-1">Estimated time: {order.estimatedTime} min</p>
-                              <Progress value={(order.elapsedTime / order.estimatedTime) * 100} className="h-2" />
-                              <p className="text-xs text-center mt-1">{order.elapsedTime} min elapsed</p>
-                            </div>
-                          )}
                         </div>
                       </div>
                       <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p className="text-muted-foreground">Hawker Centre</p>
-                          <p className="font-medium">{order.hawkerCenter}</p>
-                        </div>
                         <div>
                           <p className="text-muted-foreground">Payment Method</p>
                           <p className="font-medium">{order.paymentMethod}</p>
@@ -251,7 +183,7 @@ export default function OrdersPage() {
                       </div>
                     </CardContent>
                     <CardFooter>
-                      {order.status === "ready" ? (
+                      {order.status === "paid" ? (
                         <Button className="w-full">View Pickup Details</Button>
                       ) : order.status === "completed" ? (
                         <Button variant="outline" className="w-full" asChild>

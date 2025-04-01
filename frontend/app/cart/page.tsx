@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Trash2, Plus, Minus, CreditCard } from "lucide-react"
@@ -10,23 +10,42 @@ import { Separator } from "@/components/ui/separator"
 import { Input } from "@/components/ui/input"
 import { useCart } from "@/contexts/cart-context"
 import { Navbar } from "@/components/navbar"
+import { toast } from "sonner"
 
 export default function CartPage() {
-  const { items, removeItem, updateQuantity, getTotalItems, getSubtotal, getMaxWaitTime } = useCart()
+  const { cart, removeItem, updateQuantity, getTotalItems, getSubtotal, getMaxWaitTime } = useCart()
   const [promoCode, setPromoCode] = useState("")
   const [promoApplied, setPromoApplied] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    // Check if Stripe is properly initialized
+    if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
+      console.error("Stripe publishable key is not set")
+    }
+  }, [])
 
   const applyPromoCode = () => {
     if (promoCode.toLowerCase() === "hawker10") {
       setPromoApplied(true)
+      toast.success("Promo code applied successfully!")
     } else {
       setPromoApplied(false)
+      toast.error("Invalid promo code")
     }
   }
 
   const handleBack = () => {
     router.back()
+  }
+
+  const handleProceedToPayment = () => {
+    if (cart.items.length === 0) {
+      toast.error("Your cart is empty")
+      return
+    }
+    router.push("/payment")
   }
 
   const subtotal = getSubtotal()
@@ -35,11 +54,12 @@ export default function CartPage() {
   const total = subtotal - discount + serviceFee
 
   const stallCount = useMemo(() => {
-    const uniqueStalls = new Set(items.map((item) => item.stallName))
+    if (!cart.items || cart.items.length === 0) return 0
+    const uniqueStalls = new Set(cart.items.map((item) => item.stallName))
     return uniqueStalls.size
-  }, [items])
+  }, [cart.items])
 
-  const maxWaitTime = useMemo(() => getMaxWaitTime(), [items, getMaxWaitTime])
+  const maxWaitTime = useMemo(() => getMaxWaitTime(), [getMaxWaitTime])
 
   return (
     <div className="min-h-screen bg-background">
@@ -54,7 +74,7 @@ export default function CartPage() {
           <h2 className="text-3xl font-bold">Your Cart</h2>
         </div>
 
-        {items.length === 0 ? (
+        {cart.items.length === 0 ? (
           <Card className="mb-8">
             <CardContent className="pt-6 text-center">
               <p className="mb-4 text-muted-foreground">Your cart is empty</p>
@@ -72,7 +92,7 @@ export default function CartPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {items.map((item) => (
+                    {cart.items.map((item) => (
                       <div
                         key={`${item.id}-${item.options?.map((o) => o.choice).join("-") || "no-options"}`}
                         className="flex flex-col"
@@ -189,7 +209,7 @@ export default function CartPage() {
 
                   <div className="mt-6 p-4 bg-muted rounded-lg">
                     <h3 className="font-medium mb-2">Estimated Wait Time</h3>
-                    {items.length > 0 ? (
+                    {cart.items.length > 0 ? (
                       <>
                         <p className="text-sm mb-2">
                           Your order includes items from {stallCount} stall(s). The total estimated time is based on the
@@ -206,11 +226,13 @@ export default function CartPage() {
                   </div>
                 </CardContent>
                 <CardFooter>
-                  <Button className="w-full" asChild disabled={items.length === 0}>
-                    <Link href="/payment">
-                      <CreditCard className="h-4 w-4 mr-2" />
-                      Proceed to Payment
-                    </Link>
+                  <Button 
+                    className="w-full" 
+                    onClick={handleProceedToPayment}
+                    disabled={cart.items.length === 0 || isProcessing}
+                  >
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    {isProcessing ? "Processing..." : "Proceed to Payment"}
                   </Button>
                 </CardFooter>
               </Card>
