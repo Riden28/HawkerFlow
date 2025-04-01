@@ -47,12 +47,20 @@ function CardForm({ onSubmit }: { onSubmit: (token: string) => void }) {
   const [isCardValid, setIsCardValid] = useState(false)
 
   useEffect(() => {
+    // Log when Stripe is initialized
+    if (stripe) {
+      console.log('Stripe initialized successfully')
+    }
+  }, [stripe])
+
+  useEffect(() => {
     if (!elements) return
 
     const cardElement = elements.getElement(CardElement)
     if (!cardElement) return
 
     const handleChange = (event: any) => {
+      console.log('Card input changed:', event)
       setIsCardValid(event.complete)
       if (event.error) {
         setError(event.error.message)
@@ -69,9 +77,11 @@ function CardForm({ onSubmit }: { onSubmit: (token: string) => void }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log('Submit button clicked')
 
     if (!stripe || !elements) {
-      setError("Stripe not initialized")
+      console.error('Stripe or elements not initialized')
+      setError("Payment system not initialized")
       return
     }
 
@@ -89,14 +99,23 @@ function CardForm({ onSubmit }: { onSubmit: (token: string) => void }) {
         throw new Error("Card element not found")
       }
 
-      const {token, error: tokenError} = await stripe.createToken(cardElement)
+      console.log('Creating token...')
+      const result = await stripe.createToken(cardElement)
+      console.log('Token creation result:', result)
       
-      if (tokenError) {
-        throw tokenError
+      if (result.error) {
+        throw result.error
       }
 
-      onSubmit(token.id)
+      if (!result.token) {
+        throw new Error("Failed to generate card token")
+      }
+
+      console.log('Token generated:', result.token.id)
+      onSubmit(result.token.id)
+      toast.success("Card details verified!")
     } catch (err: any) {
+      console.error('Token creation error:', err)
       setError(err.message || "Payment failed")
       toast.error(err.message || "Payment failed")
     } finally {
@@ -154,7 +173,7 @@ export default function PaymentPage() {
   const handleCardSubmit = (token: string) => {
     setCardToken(token)
     setIsCardValid(true)
-    toast.success("Card details verified!")
+    toast.success("Card verified successfully!")
   }
 
   const handlePayment = async () => {
@@ -173,7 +192,6 @@ export default function PaymentPage() {
 
     try {
       if (paymentMethod === "card") {
-        // Create a payment intent
         const paymentResponse = await fetch("/api/order-management/process-payment", {
           method: "POST",
           headers: {
@@ -189,15 +207,35 @@ export default function PaymentPage() {
           })
         })
 
-        if (!paymentResponse.ok) {
-          const errorData = await paymentResponse.json()
-          throw new Error(errorData.message || "Payment failed")
-        }
-
         const data = await paymentResponse.json()
 
+        if (!paymentResponse.ok) {
+          // Handle different error cases
+          switch (paymentResponse.status) {
+            case 400:
+              switch (data.code) {
+                case 'card_declined':
+                  throw new Error("Your card was declined. Please try another card.")
+                case 'insufficient_funds':
+                  throw new Error("Insufficient funds in your card. Please try another card.")
+                case 'expired_card':
+                  throw new Error("Your card has expired. Please use a different card.")
+                case 'incorrect_cvc':
+                  throw new Error("Incorrect CVC code. Please check and try again.")
+                case 'invalid_card':
+                  throw new Error("Invalid card details. Please check and try again.")
+                default:
+                  throw new Error(data.message || "Payment failed. Please try again.")
+              }
+            case 500:
+              throw new Error("An internal server error occurred. Please try again later.")
+            default:
+              throw new Error("Payment failed. Please try again.")
+          }
+        }
+
         // Payment successful
-        toast.success("Payment successful!")
+        toast.success("Payment successful! Redirecting to orders...")
         
         // Create order in localStorage
         const order = {
@@ -207,7 +245,7 @@ export default function PaymentPage() {
           email,
           specialInstructions,
           paymentMethod,
-          status: "completed",
+          status: "ready_for_pickup",
           createdAt: new Date().toISOString()
         }
 
@@ -215,7 +253,7 @@ export default function PaymentPage() {
         localStorage.setItem("orders", JSON.stringify([...existingOrders, order]))
 
         clearCart()
-        router.push(`/queue?orderId=${order.id}`)
+        router.push("/orders")
       } else {
         // Handle QR and cash payments (existing logic)
         await new Promise(resolve => setTimeout(resolve, 2000))
@@ -227,7 +265,7 @@ export default function PaymentPage() {
           email,
           specialInstructions,
           paymentMethod,
-          status: "completed",
+          status: "ready_for_pickup",
           createdAt: new Date().toISOString()
         }
 
@@ -236,12 +274,15 @@ export default function PaymentPage() {
 
         clearCart()
         toast.success("Order placed successfully!")
-        router.push(`/queue?orderId=${order.id}`)
+        router.push("/orders")
       }
     } catch (err) {
       console.error("Payment error:", err)
       setError(err instanceof Error ? err.message : "Payment failed. Please try again.")
-      toast.error(err instanceof Error ? err.message : "Payment failed. Please try again.")
+      toast.error(err instanceof Error ? err.message : "Payment failed. Please try again.", {
+        description: "Please check your card details or try another payment method.",
+        duration: 5000,
+      })
     } finally {
       setIsProcessing(false)
     }
