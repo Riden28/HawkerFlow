@@ -11,30 +11,91 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { Progress } from "@/components/ui/progress"
 import { Navbar } from "@/components/navbar"
+import { toast } from "sonner"
+
+interface OrderItem {
+  id: string
+  name: string
+  price: number
+  quantity: number
+  options?: Array<{
+    name: string
+    price: number
+  }>
+}
+
+interface Order {
+  id: string
+  items: OrderItem[]
+  total: number
+  email: string
+  paymentMethod: string
+  cardToken?: string
+  specialInstructions?: string
+  status: string
+  createdAt: string
+}
 
 export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState("all")
-  const [orders, setOrders] = useState([])
+  const [orders, setOrders] = useState<Order[]>([])
   const router = useRouter()
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Load orders from localStorage when component mounts
   useEffect(() => {
-    const loadOrders = () => {
-      try {
-        const savedOrders = JSON.parse(localStorage.getItem("orders") || "[]")
-        setOrders(savedOrders)
-      } catch (error) {
-        console.error("Error loading orders:", error)
-        setOrders([])
-      }
+    // Get orders from localStorage
+    const storedOrders = JSON.parse(localStorage.getItem("orders") || "[]")
+    const currentOrder = JSON.parse(localStorage.getItem("currentOrder") || "{}")
+
+    // If there's a current order, add it to the list
+    if (currentOrder && Object.keys(currentOrder).length > 0) {
+      const updatedOrders = [...storedOrders, currentOrder]
+      localStorage.setItem("orders", JSON.stringify(updatedOrders))
+      localStorage.removeItem("currentOrder") // Clear the current order
+      setOrders(updatedOrders)
+    } else {
+      setOrders(storedOrders)
     }
 
-    loadOrders()
-    // Set up an interval to check for new orders every 30 seconds
-    const interval = setInterval(loadOrders, 30000)
-
-    return () => clearInterval(interval)
+    setIsLoading(false)
   }, [])
+
+  const handleOrderStatus = async (order: Order) => {
+    try {
+      console.log("Processing order:", order)
+      // Send order to backend
+      const response = await fetch("/api/order-management/process-order", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(order),
+      })
+
+      const responseData = await response.json()
+      console.log("Backend response:", responseData)
+
+      if (!response.ok) {
+        throw new Error(responseData.error || "Failed to process order")
+      }
+
+      // Update order status in localStorage
+      const updatedOrders = orders.map((o) =>
+        o.id === order.id ? { ...o, status: "processing" } : o
+      )
+      localStorage.setItem("orders", JSON.stringify(updatedOrders))
+      setOrders(updatedOrders)
+
+      toast.success("Order processed successfully!", {
+        description: "Your order has been sent to the kitchen"
+      })
+    } catch (error: any) {
+      console.error("Error processing order:", error)
+      toast.error("Failed to process order", {
+        description: error.message || "Please try again later"
+      })
+    }
+  }
 
   const getStatusBadge = (status: string) => {
     switch (status.toLowerCase()) {
@@ -76,6 +137,10 @@ export default function OrdersPage() {
     ? orders 
     : orders.filter((order) => order.status.toLowerCase() === activeTab)
 
+  if (isLoading) {
+    return <div>Loading...</div>
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -110,89 +175,58 @@ export default function OrdersPage() {
             ) : (
               <div className="space-y-6">
                 {filteredOrders.map((order) => (
-                  <Card key={order.orderId}>
+                  <Card key={order.id}>
                     <CardHeader>
                       <div className="flex justify-between items-start">
                         <div>
-                          <CardTitle>Order #{order.orderId}</CardTitle>
+                          <CardTitle>Order #{order.id}</CardTitle>
                           <CardDescription>
-                            {new Date(order.timestamp).toLocaleDateString()} at{" "}
-                            {new Date(order.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            {new Date(order.createdAt).toLocaleString()}
                           </CardDescription>
                         </div>
                         {getStatusBadge(order.status)}
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="md:col-span-2">
-                          <h3 className="font-medium mb-2">Order Items</h3>
-                          <div className="space-y-2">
-                            {order.items.map((item, index) => (
-                              <div key={index} className="flex flex-col">
-                                <div className="flex justify-between">
-                                  <span>
-                                    {item.quantity}x {item.name}
-                                  </span>
-                                  <span>
-                                    ${(
-                                      (item.price + (item.options?.reduce((sum, opt) => sum + opt.price, 0) || 0)) *
-                                      item.quantity
-                                    ).toFixed(2)}
-                                  </span>
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  {item.stallName}, {item.hawkerCenterName}
-                                </div>
-                              </div>
-                            ))}
-                            <Separator />
-                            <div className="flex justify-between font-bold">
-                              <span>Total</span>
-                              <span>${order.total.toFixed(2)}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-center justify-center bg-muted p-4 rounded-lg">
-                          {getStatusIcon(order.status)}
-                          <h3 className="font-medium mt-2">
-                            {order.status === "paid"
-                              ? "Ready for Pickup"
-                              : order.status === "completed"
-                                ? "Order Completed"
-                                : order.status === "cancelled"
-                                  ? "Order Cancelled"
-                                  : "Processing"}
-                          </h3>
-                          <p className="text-sm text-muted-foreground text-center mt-1">
-                            {order.status === "paid"
-                              ? "Your order is ready for pickup"
-                              : order.status === "completed"
-                                ? "Order was picked up successfully"
-                                : order.status === "cancelled"
-                                  ? "This order was cancelled"
-                                  : "Your order is being prepared"}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      <div className="space-y-4">
                         <div>
-                          <p className="text-muted-foreground">Payment Method</p>
-                          <p className="font-medium">{order.paymentMethod}</p>
+                          <h3 className="font-medium mb-2">Items</h3>
+                          {order.items.map((item, itemIndex) => (
+                            <div key={`${order.id}-${item.id}-${itemIndex}`} className="flex justify-between py-1">
+                              <div>
+                                <p>{item.name} x {item.quantity}</p>
+                                {item.options && item.options.length > 0 && (
+                                  <div className="text-sm text-muted-foreground">
+                                    {item.options.map((option, optionIndex) => (
+                                      <p key={`${order.id}-${item.id}-${option.name}-${optionIndex}`}>
+                                        {option.name} (+${option.price.toFixed(2)})
+                                      </p>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              <p className="font-medium">
+                                ${((item.price + (item.options?.reduce((sum, opt) => sum + opt.price, 0) || 0)) * item.quantity).toFixed(2)}
+                              </p>
+                            </div>
+                          ))}
                         </div>
+
+                        <Separator />
+
+                        <div className="flex justify-between">
+                          <span className="font-bold">Total</span>
+                          <span className="font-bold">${order.total.toFixed(2)}</span>
+                        </div>
+
+                        {order.specialInstructions && (
+                          <div>
+                            <h3 className="font-medium mb-1">Special Instructions</h3>
+                            <p className="text-muted-foreground">{order.specialInstructions}</p>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
-                    <CardFooter>
-                      {order.status === "paid" ? (
-                        <Button className="w-full">View Pickup Details</Button>
-                      ) : order.status === "completed" ? (
-                        <Button variant="outline" className="w-full" asChild>
-                          <Link href="/">
-                            Order Again <ArrowRight className="ml-2 h-4 w-4" />
-                          </Link>
-                        </Button>
-                      ) : null}
-                    </CardFooter>
                   </Card>
                 ))}
               </div>
@@ -201,7 +235,7 @@ export default function OrdersPage() {
         </Tabs>
       </main>
 
-      <footer className="bg-muted py-6">
+      <footer className="bg-muted py-6 mt-12">
         <div className="container mx-auto px-4 text-center text-muted-foreground">
           <p>© {new Date().getFullYear()} HawkerFlow. All rights reserved.</p>
         </div>

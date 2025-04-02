@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, CreditCard, QrCode, Banknote } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -12,148 +12,7 @@ import { Label } from "@/components/ui/label"
 import { useCart } from "@/contexts/cart-context"
 import { Navbar } from "@/components/navbar"
 import { toast } from "sonner"
-import { loadStripe } from "@stripe/stripe-js"
-import { Elements, PaymentElement, useStripe, useElements, CardElement } from "@stripe/react-stripe-js"
-
-// Initialize Stripe with error handling
-const stripePromise = (() => {
-  const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-  if (!key) {
-    console.error("Stripe publishable key is missing. Please check your environment variables.")
-    return null
-  }
-  return loadStripe(key)
-})()
-
-const appearance = {
-  theme: 'stripe',
-  variables: {
-    colorPrimary: '#0F172A',
-    colorBackground: '#ffffff',
-    colorText: '#0F172A',
-    colorDanger: '#df1b41',
-    fontFamily: 'system-ui, sans-serif',
-    spacingUnit: '4px',
-    borderRadius: '8px',
-  },
-} as const
-
-// Stripe card component
-function CardForm({ onSubmit }: { onSubmit: (token: string) => void }) {
-  const stripe = useStripe()
-  const elements = useElements()
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [isCardValid, setIsCardValid] = useState(false)
-
-  useEffect(() => {
-    // Log when Stripe is initialized
-    if (stripe) {
-      console.log('Stripe initialized successfully')
-    }
-  }, [stripe])
-
-  useEffect(() => {
-    if (!elements) return
-
-    const cardElement = elements.getElement(CardElement)
-    if (!cardElement) return
-
-    const handleChange = (event: any) => {
-      console.log('Card input changed:', event)
-      setIsCardValid(event.complete)
-      if (event.error) {
-        setError(event.error.message)
-      } else {
-        setError(null)
-      }
-    }
-
-    cardElement.on('change', handleChange)
-    return () => {
-      cardElement.off('change', handleChange)
-    }
-  }, [elements])
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    console.log('Submit button clicked')
-
-    if (!stripe || !elements) {
-      console.error('Stripe or elements not initialized')
-      setError("Payment system not initialized")
-      return
-    }
-
-    if (!isCardValid) {
-      setError("Please enter valid card details")
-      return
-    }
-
-    setIsProcessing(true)
-    setError(null)
-
-    try {
-      const cardElement = elements.getElement(CardElement)
-      if (!cardElement) {
-        throw new Error("Card element not found")
-      }
-
-      console.log('Creating token...')
-      const result = await stripe.createToken(cardElement)
-      console.log('Token creation result:', result)
-      
-      if (result.error) {
-        throw result.error
-      }
-
-      if (!result.token) {
-        throw new Error("Failed to generate card token")
-      }
-
-      console.log('Token generated:', result.token.id)
-      onSubmit(result.token.id)
-      toast.success("Card details verified!")
-    } catch (err: any) {
-      console.error('Token creation error:', err)
-      setError(err.message || "Payment failed")
-      toast.error(err.message || "Payment failed")
-    } finally {
-      setIsProcessing(false)
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="border rounded-lg p-4">
-        <CardElement 
-          options={{
-            style: {
-              base: {
-                fontSize: '16px',
-                color: '#0F172A',
-                '::placeholder': {
-                  color: '#6B7280',
-                },
-              },
-              invalid: {
-                color: '#EF4444',
-              },
-            },
-          }}
-        />
-      </div>
-      {error && <div className="text-red-500 text-sm">{error}</div>}
-      <Button
-        type="submit"
-        className="w-full"
-        disabled={!stripe || !elements || isProcessing || !isCardValid}
-      >
-        {isProcessing ? "Processing..." : "Submit Card Details"}
-      </Button>
-    </form>
-  )
-}
+import StripeTokenForm from "@/components/stripe-form"
 
 export default function PaymentPage() {
   const router = useRouter()
@@ -170,10 +29,9 @@ export default function PaymentPage() {
     router.back()
   }
 
-  const handleCardSubmit = (token: string) => {
+  const handleCardTokenGenerated = (token: string) => {
     setCardToken(token)
     setIsCardValid(true)
-    toast.success("Card verified successfully!")
   }
 
   const handlePayment = async () => {
@@ -191,47 +49,43 @@ export default function PaymentPage() {
     setError(null)
 
     try {
+      // Prepare order data
+      const orderData = {
+        items: cart.items.map(item => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          options: item.options?.map(opt => ({
+            name: opt.name,
+            price: opt.price
+          }))
+        })),
+        total: calculateTotal(),
+        email,
+        specialInstructions,
+        paymentMethod,
+        status: "pending",
+        createdAt: new Date().toISOString()
+      }
+
       if (paymentMethod === "card") {
-        const paymentResponse = await fetch("/api/order-management/process-payment", {
+        // Send order data with Stripe token to backend
+        const response = await fetch("/api/order-management/process-order", {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            token: cardToken,
-            amount: calculateTotal(),
-            email,
-            items: cart.items,
-            specialInstructions,
-            paymentMethod
+            ...orderData,
+            stripeToken: cardToken
           })
         })
 
-        const data = await paymentResponse.json()
+        const data = await response.json()
 
-        if (!paymentResponse.ok) {
-          // Handle different error cases
-          switch (paymentResponse.status) {
-            case 400:
-              switch (data.code) {
-                case 'card_declined':
-                  throw new Error("Your card was declined. Please try another card.")
-                case 'insufficient_funds':
-                  throw new Error("Insufficient funds in your card. Please try another card.")
-                case 'expired_card':
-                  throw new Error("Your card has expired. Please use a different card.")
-                case 'incorrect_cvc':
-                  throw new Error("Incorrect CVC code. Please check and try again.")
-                case 'invalid_card':
-                  throw new Error("Invalid card details. Please check and try again.")
-                default:
-                  throw new Error(data.message || "Payment failed. Please try again.")
-              }
-            case 500:
-              throw new Error("An internal server error occurred. Please try again later.")
-            default:
-              throw new Error("Payment failed. Please try again.")
-          }
+        if (!response.ok) {
+          throw new Error(data.message || "Failed to process order")
         }
 
         // Payment successful
@@ -240,13 +94,8 @@ export default function PaymentPage() {
         // Create order in localStorage
         const order = {
           id: data.orderId,
-          items: cart.items,
-          total: calculateTotal(),
-          email,
-          specialInstructions,
-          paymentMethod,
-          status: "ready_for_pickup",
-          createdAt: new Date().toISOString()
+          ...orderData,
+          status: "ready_for_pickup"
         }
 
         const existingOrders = JSON.parse(localStorage.getItem("orders") || "[]")
@@ -255,18 +104,13 @@ export default function PaymentPage() {
         clearCart()
         router.push("/orders")
       } else {
-        // Handle QR and cash payments (existing logic)
+        // Handle QR and cash payments
         await new Promise(resolve => setTimeout(resolve, 2000))
 
         const order = {
           id: `ORD-${Date.now()}`,
-          items: cart.items,
-          total: calculateTotal(),
-          email,
-          specialInstructions,
-          paymentMethod,
-          status: "ready_for_pickup",
-          createdAt: new Date().toISOString()
+          ...orderData,
+          status: "ready_for_pickup"
         }
 
         const existingOrders = JSON.parse(localStorage.getItem("orders") || "[]")
@@ -288,51 +132,16 @@ export default function PaymentPage() {
     }
   }
 
-  const renderPaymentForm = () => {
-    switch (paymentMethod) {
-      case "card":
-        if (!stripePromise) {
-          return (
-            <div className="p-4 text-red-500">
-              Card payment is currently unavailable. Please try another payment method.
-            </div>
-          )
-        }
-        return (
-          <Elements stripe={stripePromise} options={{ appearance }}>
-            <CardForm onSubmit={handleCardSubmit} />
-          </Elements>
-        )
-      case "qr":
-        return (
-          <div className="text-center p-6">
-            <QrCode className="w-48 h-48 mx-auto mb-4" />
-            <p className="text-muted-foreground">Scan this QR code with your mobile payment app</p>
-            <p className="font-medium mt-2">Amount: ${calculateTotal().toFixed(2)}</p>
-          </div>
-        )
-      case "cash":
-        return (
-          <div className="text-center p-6">
-            <Banknote className="w-24 h-24 mx-auto mb-4" />
-            <p className="text-muted-foreground">Pay with cash upon food collection</p>
-            <p className="font-medium mt-2">Amount to prepare: ${calculateTotal().toFixed(2)}</p>
-          </div>
-        )
-    }
-  }
-
   const calculateSubtotal = () => {
     return cart.items.reduce((total, item) => {
       const itemTotal = item.price * item.quantity
-      const optionsTotal = item.options?.reduce((sum, option) => sum + option.price, 0) || 0
+      const optionsTotal = item.options?.reduce((sum, opt) => sum + opt.price, 0) || 0
       return total + (itemTotal + optionsTotal * item.quantity)
     }, 0)
   }
 
   const calculateDiscount = () => {
-    const subtotal = calculateSubtotal()
-    return subtotal * 0.1 // 10% discount
+    return calculateSubtotal() * 0.1 // 10% discount
   }
 
   const calculateServiceFee = () => {
@@ -423,7 +232,25 @@ export default function PaymentPage() {
                     </RadioGroup>
                   </div>
 
-                  {renderPaymentForm()}
+                  {paymentMethod === "card" && (
+                    <StripeTokenForm onTokenGenerated={handleCardTokenGenerated} />
+                  )}
+
+                  {paymentMethod === "qr" && (
+                    <div className="text-center p-6">
+                      <QrCode className="w-48 h-48 mx-auto mb-4" />
+                      <p className="text-muted-foreground">Scan this QR code with your mobile payment app</p>
+                      <p className="font-medium mt-2">Amount: ${calculateTotal().toFixed(2)}</p>
+                    </div>
+                  )}
+
+                  {paymentMethod === "cash" && (
+                    <div className="text-center p-6">
+                      <Banknote className="w-24 h-24 mx-auto mb-4" />
+                      <p className="text-muted-foreground">Pay with cash upon food collection</p>
+                      <p className="font-medium mt-2">Amount to prepare: ${calculateTotal().toFixed(2)}</p>
+                    </div>
+                  )}
 
                   <div>
                     <label htmlFor="special-instructions" className="block text-sm font-medium mb-2">
@@ -442,8 +269,8 @@ export default function PaymentPage() {
                     <div className="text-red-500 text-sm">{error}</div>
                   )}
 
-                  <Button
-                    className="w-full"
+                  <Button 
+                    className="w-full" 
                     onClick={handlePayment}
                     disabled={isProcessing || (paymentMethod === "card" && !isCardValid)}
                   >
