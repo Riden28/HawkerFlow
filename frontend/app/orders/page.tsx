@@ -174,8 +174,8 @@ export default function OrdersPage() {
               </Card>
             ) : (
               <div className="space-y-6">
-                {filteredOrders.map((order) => (
-                  <Card key={order.id}>
+                {filteredOrders.map((order, index) => (
+                  <Card key={`order-${order.id}-${index}`}>
                     <CardHeader>
                       <div className="flex justify-between items-start">
                         <div>
@@ -192,13 +192,13 @@ export default function OrdersPage() {
                         <div>
                           <h3 className="font-medium mb-2">Items</h3>
                           {order.items.map((item, itemIndex) => (
-                            <div key={`${order.id}-${item.id}-${itemIndex}`} className="flex justify-between py-1">
+                            <div key={`item-${order.id}-${item.id}-${itemIndex}`} className="flex justify-between py-1">
                               <div>
                                 <p>{item.name} x {item.quantity}</p>
                                 {item.options && item.options.length > 0 && (
                                   <div className="text-sm text-muted-foreground">
                                     {item.options.map((option, optionIndex) => (
-                                      <p key={`${order.id}-${item.id}-${option.name}-${optionIndex}`}>
+                                      <p key={`option-${order.id}-${item.id}-${option.name}-${optionIndex}`}>
                                         {option.name} (+${option.price.toFixed(2)})
                                       </p>
                                     ))}

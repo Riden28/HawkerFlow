@@ -49,79 +49,70 @@ export default function PaymentPage() {
     setError(null)
 
     try {
-      // Prepare order data
-      const orderData = {
-        items: cart.items.map(item => ({
-          id: item.id,
-          name: item.name,
-          quantity: item.quantity,
-          price: item.price,
-          options: item.options?.map(opt => ({
-            name: opt.name,
-            price: opt.price
-          }))
-        })),
+      console.log("Starting payment process...")
+      const requestData = {
+        stripeToken: cardToken,
+        total: calculateTotal(),
+        email,
+        items: cart.items,
+        specialInstructions,
+        paymentMethod
+      }
+      console.log("Sending request data:", requestData)
+
+      // Send payment and order data to our API route
+      const response = await fetch("/api/order-management/process-order", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(requestData)
+      })
+
+      console.log("Received response:", response.status, response.statusText)
+      const data = await response.json()
+      console.log("Response data:", data)
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to process order")
+      }
+
+      // Payment successful
+      console.log("Payment successful, creating local order...")
+      toast.success("Payment successful! Redirecting to orders...")
+      
+      // Create order in localStorage
+      const order = {
+        id: data.orderId,
+        items: cart.items,
         total: calculateTotal(),
         email,
         specialInstructions,
         paymentMethod,
-        status: "pending",
+        status: "ready_for_pickup",
         createdAt: new Date().toISOString()
       }
 
-      if (paymentMethod === "card") {
-        // Send order data with Stripe token to backend
-        const response = await fetch("/api/order-management/process-order", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            ...orderData,
-            stripeToken: cardToken
-          })
-        })
+      const existingOrders = JSON.parse(localStorage.getItem("orders") || "[]")
+      localStorage.setItem("orders", JSON.stringify([...existingOrders, order]))
+      console.log("Local order created:", order)
 
-        const data = await response.json()
-
-        if (!response.ok) {
-          throw new Error(data.message || "Failed to process order")
-        }
-
-        // Payment successful
-        toast.success("Payment successful! Redirecting to orders...")
-        
-        // Create order in localStorage
-        const order = {
-          id: data.orderId,
-          ...orderData,
-          status: "ready_for_pickup"
-        }
-
-        const existingOrders = JSON.parse(localStorage.getItem("orders") || "[]")
-        localStorage.setItem("orders", JSON.stringify([...existingOrders, order]))
-
-        clearCart()
-        router.push("/orders")
-      } else {
-        // Handle QR and cash payments
-        await new Promise(resolve => setTimeout(resolve, 2000))
-
-        const order = {
-          id: `ORD-${Date.now()}`,
-          ...orderData,
-          status: "ready_for_pickup"
-        }
-
-        const existingOrders = JSON.parse(localStorage.getItem("orders") || "[]")
-        localStorage.setItem("orders", JSON.stringify([...existingOrders, order]))
-
-        clearCart()
-        toast.success("Order placed successfully!")
-        router.push("/orders")
-      }
+      // Clear the card token and form state
+      setCardToken(null)
+      setIsCardValid(false)
+      
+      clearCart()
+      router.push("/orders")
     } catch (err) {
       console.error("Payment error:", err)
+      console.error("Full error details:", {
+        name: err instanceof Error ? err.name : "Unknown",
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined
+      })
+      // Clear the card token on error so user can try again
+      setCardToken(null)
+      setIsCardValid(false)
       setError(err instanceof Error ? err.message : "Payment failed. Please try again.")
       toast.error(err instanceof Error ? err.message : "Payment failed. Please try again.", {
         description: "Please check your card details or try another payment method.",

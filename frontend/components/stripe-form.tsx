@@ -8,8 +8,15 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
 
+// Make sure we have the key
+const stripeKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+if (!stripeKey) {
+  console.error("Stripe publishable key is missing!")
+}
+
 // Initialize Stripe with your publishable key
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
+const stripePromise = loadStripe(stripeKey!)
+console.log("Stripe initialization status:", stripePromise ? "Success" : "Failed")
 
 // The form component that collects card details
 function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: string) => void }) {
@@ -20,15 +27,27 @@ function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: string) 
   const [isCardValid, setIsCardValid] = useState(false)
 
   useEffect(() => {
-    if (!elements) return
+    // Log initialization status
+    console.log("Stripe available:", !!stripe)
+    console.log("Elements available:", !!elements)
+
+    if (!stripe || !elements) {
+      setError("Payment system is initializing...")
+      return
+    }
 
     const cardElement = elements.getElement(CardElement)
-    if (!cardElement) return
+    if (!cardElement) {
+      setError("Card element not found")
+      return
+    }
 
     const handleChange = (event: any) => {
+      console.log("Card input change:", event.complete ? "complete" : "incomplete")
       setIsCardValid(event.complete)
       if (event.error) {
         setError(event.error.message)
+        console.error("Card input error:", event.error)
       } else {
         setError(null)
       }
@@ -38,7 +57,7 @@ function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: string) 
     return () => {
       cardElement.off('change', handleChange)
     }
-  }, [elements])
+  }, [stripe, elements])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -92,21 +111,27 @@ function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: string) 
         <label htmlFor="card-element" className="text-sm font-medium">
           Card Details
         </label>
-        <div className="border rounded-md p-3">
+        <div className="border rounded-md p-3 bg-white">
           <CardElement
+            id="card-element"
             options={{
               style: {
                 base: {
                   fontSize: "16px",
                   color: "#424770",
+                  fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+                  fontSmoothing: "antialiased",
                   "::placeholder": {
                     color: "#aab7c4",
                   },
+                  backgroundColor: "white",
                 },
                 invalid: {
                   color: "#9e2146",
+                  iconColor: "#9e2146"
                 },
               },
+              hidePostalCode: true
             }}
           />
         </div>
@@ -127,6 +152,16 @@ function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: string) 
 
 // The main component that wraps the form with Stripe Elements
 export default function StripeTokenForm({ onTokenGenerated }: { onTokenGenerated: (token: string) => void }) {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return <div>Loading payment form...</div>
+  }
+
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader>
@@ -138,7 +173,9 @@ export default function StripeTokenForm({ onTokenGenerated }: { onTokenGenerated
           <CheckoutForm onTokenGenerated={onTokenGenerated} />
         </Elements>
       </CardContent>
-      <CardFooter className="text-xs text-gray-500">Your payment information is secured with Stripe.</CardFooter>
+      <CardFooter className="text-xs text-gray-500">
+        Your payment information is secured with Stripe.
+      </CardFooter>
     </Card>
   )
 } 
