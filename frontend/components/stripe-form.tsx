@@ -19,7 +19,7 @@ const stripePromise = loadStripe(stripeKey!)
 console.log("Stripe initialization status:", stripePromise ? "Success" : "Failed")
 
 // The form component that collects card details
-function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: string) => void }) {
+function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: any) => void }) {
   const stripe = useStripe()
   const elements = useElements()
   const [loading, setLoading] = useState(false)
@@ -93,8 +93,8 @@ function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: string) 
         throw new Error("Failed to generate card token")
       }
 
-      // Pass the token to the parent component
-      onTokenGenerated(result.token.id)
+      // Pass the complete token object to the parent component
+      onTokenGenerated(result.token)
       toast.success("Card details verified!")
     } catch (err: any) {
       console.error("Error creating token:", err)
@@ -151,7 +151,7 @@ function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: string) 
 }
 
 // The main component that wraps the form with Stripe Elements
-export default function StripeTokenForm({ onTokenGenerated }: { onTokenGenerated: (token: string) => void }) {
+export default function StripeTokenForm({ onTokenGenerated }: { onTokenGenerated: (token: any) => void }) {
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {

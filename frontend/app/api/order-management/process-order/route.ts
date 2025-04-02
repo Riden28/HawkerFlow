@@ -1,20 +1,17 @@
 import { NextResponse } from "next/server"
 import Stripe from "stripe"
-import fs from "fs"
 import path from "path"
+import fs from "fs"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-02-24.acacia"
 })
 
-const ORDERS_DIR = path.join(process.cwd(), "backend", "orderMgmt")
-console.log("Orders directory path:", ORDERS_DIR)
-
 // Ensure orders directory exists
-if (!fs.existsSync(ORDERS_DIR)) {
+if (!fs.existsSync(path.join(process.cwd(), "backend", "orderMgmt"))) {
   console.log("Creating orders directory...")
-  fs.mkdirSync(ORDERS_DIR, { recursive: true })
-  console.log(`Created orders directory at: ${ORDERS_DIR}`)
+  fs.mkdirSync(path.join(process.cwd(), "backend", "orderMgmt"), { recursive: true })
+  console.log(`Created orders directory at: ${path.join(process.cwd(), "backend", "orderMgmt")}`)
 } else {
   console.log("Orders directory already exists")
 }
@@ -44,6 +41,26 @@ interface FormattedOrderItem {
   subtotal: number
 }
 
+const saveOrderToFile = async (orderId: string, orderData: any) => {
+  try {
+    // Change the directory path to the main backend folder
+    const orderMgtDir = path.join(process.cwd(), '..', 'backend', 'orderMgt')
+    const filePath = path.join(orderMgtDir, `${orderId}.json`)
+
+    // Ensure the directory exists
+    if (!fs.existsSync(orderMgtDir)) {
+      fs.mkdirSync(orderMgtDir, { recursive: true })
+    }
+
+    // Write the order data to file
+    await fs.promises.writeFile(filePath, JSON.stringify(orderData, null, 2))
+    console.log(`Order saved to ${filePath}`)
+  } catch (error) {
+    console.error('Error saving order to file:', error)
+    throw error
+  }
+}
+
 export async function POST(request: Request) {
   console.log("API Route: Received POST request")
   
@@ -58,7 +75,7 @@ export async function POST(request: Request) {
       specialInstructions: body.specialInstructions || "None"
     })
     
-    const { stripeToken, total, email, items, specialInstructions, paymentMethod } = body
+    const { stripeToken, tokenObject, total, email, items, specialInstructions, paymentMethod } = body
 
     // Format order items with detailed information
     const formattedItems = items.map((item: OrderItem): FormattedOrderItem => ({
@@ -96,19 +113,18 @@ export async function POST(request: Request) {
       }
 
       try {
-        console.log("API Route: Creating Stripe charge")
-        // Create a charge using Stripe
+        // Create a charge using Stripe with the token ID
         const charge = await stripe.charges.create({
           amount: Math.round(total * 100),
           currency: "sgd",
-          source: stripeToken,
+          source: stripeToken,  // Use the token ID directly
           receipt_email: email,
           description: `Order for ${email}`,
           metadata: {
-            order_items: JSON.stringify(formattedItems.map((item: FormattedOrderItem) => ({
+            order_items: JSON.stringify(formattedItems.map((item: OrderItem) => ({
               name: item.name,
               quantity: item.quantity,
-              options: item.options.map((opt: { name: string }) => opt.name).join(", ")
+              options: item.options?.map((opt: { name: string }) => opt.name).join(", ")
             }))),
             special_instructions: specialInstructions || "None",
             total_amount: total.toFixed(2)
@@ -116,53 +132,52 @@ export async function POST(request: Request) {
         })
         console.log("API Route: Stripe charge created:", charge.id)
 
-        // Prepare order data
+        // Prepare complete order data using the token object we received
         const orderData = {
-          order_id: charge.id,
-          order_date: new Date().toISOString(),
-          payment_details: {
-            stripe_token: stripeToken,
-            charge_id: charge.id,
-            payment_method: "card",
-            status: "paid"
-          },
-          customer_details: {
-            email: email
-          },
-          order_items: formattedItems,
-          order_summary: orderSummary,
-          special_instructions: specialInstructions || "None",
-          status: "ready_for_pickup"
+          token: tokenObject,  // Store the complete token object
+          order_details: {
+            items: formattedItems.map((item: OrderItem) => ({
+              id: item.id,
+              name: item.name,
+              quantity: item.quantity,
+              unit_price: item.price,
+              options: item.options?.map(opt => ({
+                name: opt.name,
+                price: opt.price
+              })) || [],
+              item_total: item.price * item.quantity,
+              options_total: (item.options?.reduce((sum, opt) => sum + opt.price, 0) || 0) * item.quantity,
+              subtotal: item.price * item.quantity + 
+                (item.options?.reduce((sum, opt) => sum + opt.price, 0) || 0) * item.quantity
+            })),
+            order_summary: {
+              subtotal: orderSummary.subtotal,
+              discount: orderSummary.discount,
+              service_fee: orderSummary.service_fee,
+              total_amount: orderSummary.total_amount
+            },
+            special_instructions: specialInstructions || "None",
+            customer_email: email,
+            order_id: charge.id,
+            order_date: new Date().toISOString(),
+            payment_status: "paid",
+            order_status: "ready_for_pickup",
+            charge_id: charge.id
+          }
         }
 
-        // Save order to file
-        const orderFile = path.join(ORDERS_DIR, `${charge.id}.json`)
-        console.log("Saving card payment order to:", orderFile)
-        console.log("Order details:", {
-          id: orderData.order_id,
-          items: orderData.order_items.map((item: FormattedOrderItem) => `${item.quantity}x ${item.name}`),
-          special_instructions: orderData.special_instructions,
-          total: orderData.order_summary.total_amount
-        })
-        
-        fs.writeFileSync(orderFile, JSON.stringify(orderData, null, 2))
-        console.log("Order file saved successfully")
+        // Save complete order to file
+        await saveOrderToFile(charge.id, orderData)
 
         return NextResponse.json({
           orderId: charge.id,
           message: "Payment processed successfully"
         })
+
       } catch (stripeError: any) {
-        console.error("API Route: Stripe error:", {
-          message: stripeError.message,
-          code: stripeError.code,
-          type: stripeError.type
-        })
+        console.error("API Route: Stripe error:", stripeError)
         return NextResponse.json(
-          { 
-            message: stripeError.message,
-            code: stripeError.code 
-          },
+          { message: stripeError.message },
           { status: 400 }
         )
       }
@@ -188,17 +203,7 @@ export async function POST(request: Request) {
       }
 
       // Save order to file
-      const orderFile = path.join(ORDERS_DIR, `${orderId}.json`)
-      console.log("Saving non-card payment order to:", orderFile)
-      console.log("Order details:", {
-        id: orderData.order_id,
-        items: orderData.order_items.map((item: FormattedOrderItem) => `${item.quantity}x ${item.name}`),
-        special_instructions: orderData.special_instructions,
-        total: orderData.order_summary.total_amount
-      })
-      
-      fs.writeFileSync(orderFile, JSON.stringify(orderData, null, 2))
-      console.log("Order file saved successfully")
+      await saveOrderToFile(orderId, orderData)
 
       return NextResponse.json({
         orderId,

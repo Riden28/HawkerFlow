@@ -22,14 +22,16 @@ export default function PaymentPage() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<"card" | "qr" | "cash">("card")
-  const [cardToken, setCardToken] = useState<string | null>(null)
+  const [cardToken, setCardToken] = useState<any>(null)
   const [isCardValid, setIsCardValid] = useState(false)
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false)
 
   const handleBack = () => {
     router.back()
   }
 
-  const handleCardTokenGenerated = (token: string) => {
+  const handleCardTokenGenerated = (token: any) => {
+    console.log("Token generated:", token)
     setCardToken(token)
     setIsCardValid(true)
   }
@@ -45,22 +47,84 @@ export default function PaymentPage() {
       return
     }
 
+    if (!cart?.items || cart.items.length === 0) {
+      setError("Your cart is empty")
+      return
+    }
+
     setIsProcessing(true)
     setError(null)
 
     try {
       console.log("Starting payment process...")
+      const orderItems = cart.items.map(item => ({
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        stallName: item.stallName,
+        hawkerCenterName: item.hawkerCenterName,
+        waitTime: item.waitTime,
+        prepTime: item.prepTime,
+        image: item.image,
+        options: item.options || [],
+        specialInstructions: item.specialInstructions
+      }))
+
+      // Create the complete request data structure
       const requestData = {
-        stripeToken: cardToken,
-        total: calculateTotal(),
+        createdAt: new Date().toISOString(),
         email,
-        items: cart.items,
+        stripeToken: cardToken.id,
+        token: {
+          card: {
+            address_city: cardToken.card.address_city,
+            address_country: cardToken.card.address_country,
+            address_line1: cardToken.card.address_line1,
+            address_line1_check: cardToken.card.address_line1_check,
+            address_line2: cardToken.card.address_line2,
+            address_state: cardToken.card.address_state,
+            address_zip: cardToken.card.address_zip,
+            address_zip_check: cardToken.card.address_zip_check,
+            brand: cardToken.card.brand,
+            country: cardToken.card.country,
+            cvc_check: cardToken.card.cvc_check,
+            dynamic_last4: cardToken.card.dynamic_last4,
+            exp_month: cardToken.card.exp_month,
+            exp_year: cardToken.card.exp_year,
+            funding: cardToken.card.funding,
+            id: cardToken.card.id,
+            last4: cardToken.card.last4,
+            name: cardToken.card.name,
+            networks: cardToken.card.networks,
+            object: cardToken.card.object,
+            regulated_status: cardToken.card.regulated_status,
+            tokenization_method: cardToken.card.tokenization_method,
+            wallet: cardToken.card.wallet
+          },
+          client_ip: cardToken.client_ip,
+          created: cardToken.created,
+          id: cardToken.id,
+          livemode: cardToken.livemode,
+          object: cardToken.object,
+          type: cardToken.type,
+          used: cardToken.used
+        },
+        items: orderItems,
+        paymentMethod,
         specialInstructions,
-        paymentMethod
+        status: "ready_for_pickup",
+        total: calculateTotal(),
+        orderSummary: {
+          subtotal: calculateSubtotal(),
+          discount: calculateDiscount(),
+          serviceFee: calculateServiceFee(),
+          total: calculateTotal()
+        }
       }
+
       console.log("Sending request data:", requestData)
 
-      // Send payment and order data to our API route
       const response = await fetch("/api/order-management/process-order", {
         method: "POST",
         headers: {
@@ -84,7 +148,7 @@ export default function PaymentPage() {
       // Create order in localStorage
       const order = {
         id: data.orderId,
-        items: cart.items,
+        items: orderItems,
         total: calculateTotal(),
         email,
         specialInstructions,
@@ -95,7 +159,28 @@ export default function PaymentPage() {
 
       const existingOrders = JSON.parse(localStorage.getItem("orders") || "[]")
       localStorage.setItem("orders", JSON.stringify([...existingOrders, order]))
-      console.log("Local order created:", order)
+      console.log("=== FINAL DATA SENT TO ORDERMGMT ===")
+      console.log({
+        createdAt: new Date().toISOString(),
+        email,
+        id: data.orderId,
+        token: {
+          card: cardToken.card,
+          client_ip: cardToken.client_ip,
+          created: cardToken.created,
+          id: cardToken.id,
+          livemode: cardToken.livemode,
+          object: cardToken.object,
+          type: cardToken.type,
+          used: cardToken.used
+        },
+        items: orderItems,
+        paymentMethod,
+        specialInstructions,
+        status: "ready_for_pickup",
+        total: calculateTotal()
+      })
+      console.log("=== END OF ORDERMGMT DATA ===")
 
       // Clear the card token and form state
       setCardToken(null)
@@ -103,16 +188,9 @@ export default function PaymentPage() {
       
       clearCart()
       router.push("/orders")
+
     } catch (err) {
       console.error("Payment error:", err)
-      console.error("Full error details:", {
-        name: err instanceof Error ? err.name : "Unknown",
-        message: err instanceof Error ? err.message : String(err),
-        stack: err instanceof Error ? err.stack : undefined
-      })
-      // Clear the card token on error so user can try again
-      setCardToken(null)
-      setIsCardValid(false)
       setError(err instanceof Error ? err.message : "Payment failed. Please try again.")
       toast.error(err instanceof Error ? err.message : "Payment failed. Please try again.", {
         description: "Please check your card details or try another payment method.",
@@ -263,7 +341,11 @@ export default function PaymentPage() {
                   <Button 
                     className="w-full" 
                     onClick={handlePayment}
-                    disabled={isProcessing || (paymentMethod === "card" && !isCardValid)}
+                    disabled={
+                      isProcessing || 
+                      (paymentMethod === "card" && (!cardToken || !isCardValid)) ||
+                      !email
+                    }
                   >
                     {isProcessing ? "Processing..." : `Pay ${paymentMethod === "cash" ? "Later" : "Now"}`}
                   </Button>

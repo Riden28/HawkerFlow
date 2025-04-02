@@ -1,0 +1,28 @@
+{
+  "order_details": {
+    "items": [
+      {
+        "id": 101,
+        "name": "Chicken Rice",
+        "quantity": 1,
+        "options": [],
+        "item_total": null,
+        "options_total": 0,
+        "subtotal": null
+      }
+    ],
+    "order_summary": {
+      "subtotal": 5.5,
+      "discount": 0.55,
+      "service_fee": 0.5,
+      "total_amount": 5.45
+    },
+    "special_instructions": "None",
+    "customer_email": "amberlyfong.2023@scis.smu.edu.sg",
+    "order_id": "ch_3R9SdhFKfP7LOez70mJaRIdm",
+    "order_date": "2025-04-02T14:51:38.819Z",
+    "payment_status": "paid",
+    "order_status": "ready_for_pickup",
+    "charge_id": "ch_3R9SdhFKfP7LOez70mJaRIdm"
+  }
+}
