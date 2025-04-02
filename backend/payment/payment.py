@@ -22,16 +22,20 @@ def payment():
     token = data["token"]
 
     try:
-        # Create a PaymentIntent using the test token
-        payment_intent = stripe.PaymentIntent.create(
-            amount=payment_amount * 100,  # Amount in cents (e.g., $10.00)
-            currency="sgd",
-            #change once frontend can deliver the token
-            # payment_method=token  # Use the test token ID here
-            # confirm=True  # Confirm the payment immediately
-            automatic_payment_methods={"enabled": True}
+    # Step 1: Create a PaymentMethod using the token
+        payment_method = stripe.PaymentMethod.create(
+            type="card",
+            card={"token": token["id"]}  #card is the parameter in the stripe.PaymentMethod function --> points to token id 
         )
 
+        # Step 2: Create a PaymentIntent with the created PaymentMethod
+        payment_intent = stripe.PaymentIntent.create(
+            amount=int(payment_amount * 100),  # Convert to cents
+            currency="sgd",
+            payment_method=payment_method.id,  # Use the created PaymentMethod ID
+            confirm=True, # Confirm the payment immediately
+            automatic_payment_methods={"enabled": True, "allow_redirects": 'never'}
+        )
         # Return a success response
         return jsonify({
             "code": 200,
