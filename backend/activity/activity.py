@@ -68,15 +68,35 @@ def run_consumer():
     print("🟢 activityLog microservice listening on RabbitMQ topic 'Q_log'...")
     channel.start_consuming()
 
-@app.route('/activity/<string:week_id>', methods=['GET'])
+@app.route('/activity/logs/<string:week_id>', methods=['GET'])
 def get_activity_logs(week_id):
     try:
         docs = db.collection(week_id).stream()
-        logs = [doc.to_dict() | {"id": doc.id} for doc in docs]
+        logs = [doc.to_dict() for doc in docs]
         return jsonify(logs), 200
     except Exception as e:
+        print(f"❌ Failed to fetch {week_id}'s logs: {e}")
+        return jsonify({"error": str(e)}), 500
+    
+# create endpoint that sends composite microservice aggregator flat data. 
+# GET {5008}/activity/logs
+@app.route('/activity/logs', methods=['GET'])
+def get_current_week_logs():
+    try:
+        # Get current week ID (e.g., 2025-wk13)
+        now = datetime.utcnow()
+        current_week_id = get_week_id(now)
+
+        # Fetch documents from the current week’s collection
+        docs = db.collection(current_week_id).stream()
+        logs = [doc.to_dict() for doc in docs]
+
+        return jsonify(logs), 200
+
+    except Exception as e:
+        print(f"❌ Failed to fetch current week logs: {e}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     threading.Thread(target=run_consumer, daemon=True).start()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5008)

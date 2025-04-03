@@ -124,7 +124,7 @@ def get_dishes_in_stall(hawkername, stallname):
 
 #     return jsonify({"message": "Wait times updated successfully"}), 200
 
-@app.route("/menu/waitTime", methods=["PUT"])
+@app.route("/menu/waitTime", methods=["PATCH"])
 def update_wait_times():
     """
     Updates waitTime for multiple hawker dishes.
