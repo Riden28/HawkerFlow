@@ -27,6 +27,10 @@ function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: any) => 
   const [isCardValid, setIsCardValid] = useState(false)
 
   useEffect(() => {
+    // Log initialization status
+    console.log("Stripe available:", !!stripe)
+    console.log("Elements available:", !!elements)
+
     if (!stripe || !elements) {
       setError("Payment system is initializing...")
       return
@@ -39,9 +43,11 @@ function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: any) => 
     }
 
     const handleChange = (event: any) => {
+      console.log("Card input change:", event.complete ? "complete" : "incomplete")
       setIsCardValid(event.complete)
       if (event.error) {
         setError(event.error.message)
+        console.error("Card input error:", event.error)
       } else {
         setError(null)
       }
@@ -55,8 +61,14 @@ function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: any) => 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
     if (!stripe || !elements) {
       setError("Payment system not initialized")
+      return
+    }
+
+    if (!isCardValid) {
+      setError("Please enter valid card details")
       return
     }
 
@@ -69,7 +81,10 @@ function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: any) => 
         throw new Error("Card element not found")
       }
 
+      console.log("Creating token...")
       const result = await stripe.createToken(cardElement)
+      console.log("Token creation result:", result)
+
       if (result.error) {
         throw result.error
       }
@@ -78,6 +93,7 @@ function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: any) => 
         throw new Error("Failed to generate card token")
       }
 
+      // Pass the complete token object to the parent component
       onTokenGenerated(result.token)
       toast.success("Card details verified!")
     } catch (err: any) {
@@ -90,65 +106,47 @@ function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: any) => 
   }
 
   return (
-    <div className="w-full">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-2">
-          <div 
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white relative" 
-            style={{ minHeight: '44px' }}
-          >
-            <CardElement
-              id="card-element"
-              options={{
-                style: {
-                  base: {
-                    fontSize: '16px',
-                    color: '#424770',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif',
-                    '::placeholder': {
-                      color: '#aab7c4',
-                    },
-                    ':-webkit-autofill': {
-                      color: '#424770',
-                    },
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-2">
+        <label htmlFor="card-element" className="text-sm font-medium">
+          Card Details
+        </label>
+        <div className="border rounded-md p-3 bg-white">
+          <CardElement
+            id="card-element"
+            options={{
+              style: {
+                base: {
+                  fontSize: "16px",
+                  color: "#424770",
+                  fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+                  fontSmoothing: "antialiased",
+                  "::placeholder": {
+                    color: "#aab7c4",
                   },
-                  invalid: {
-                    color: '#9e2146',
-                    iconColor: '#9e2146'
-                  }
+                  backgroundColor: "white",
                 },
-                classes: {
-                  base: 'stripe-element',
-                  complete: 'stripe-element--complete',
-                  empty: 'stripe-element--empty',
-                  focus: 'stripe-element--focus',
-                  invalid: 'stripe-element--invalid',
-                  webkitAutofill: 'stripe-element--webkit-autofill'
+                invalid: {
+                  color: "#9e2146",
+                  iconColor: "#9e2146"
                 },
-                hidePostalCode: true,
-                showIcon: true,
-                iconStyle: 'solid'
-              }}
-              className="w-full h-full"
-            />
-          </div>
+              },
+              hidePostalCode: true
+            }}
+          />
         </div>
+      </div>
 
-        <Button 
-          type="submit" 
-          disabled={!stripe || loading || !isCardValid}
-          className="w-full"
-        >
-          {loading ? "Processing..." : "Submit Card Details"}
-        </Button>
+      <Button 
+        type="submit" 
+        disabled={!stripe || loading || !isCardValid} 
+        className="w-full"
+      >
+        {loading ? "Processing..." : "Submit Card Details"}
+      </Button>
 
-        {error && (
-          <div className="mt-2 text-sm text-red-600">
-            {error}
-          </div>
-        )}
-      </form>
-    </div>
+      {error && <div className="text-red-500 text-sm mt-2">{error}</div>}
+    </form>
   )
 }
 
@@ -165,10 +163,19 @@ export default function StripeTokenForm({ onTokenGenerated }: { onTokenGenerated
   }
 
   return (
-    <div className="w-full">
-      <Elements stripe={stripePromise}>
-        <CheckoutForm onTokenGenerated={onTokenGenerated} />
-      </Elements>
-    </div>
+    <Card className="w-full max-w-md mx-auto">
+      <CardHeader>
+        <CardTitle>Payment Information</CardTitle>
+        <CardDescription>Enter your card details to create a Stripe token</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Elements stripe={stripePromise}>
+          <CheckoutForm onTokenGenerated={onTokenGenerated} />
+        </Elements>
+      </CardContent>
+      <CardFooter className="text-xs text-gray-500">
+        Your payment information is secured with Stripe.
+      </CardFooter>
+    </Card>
   )
 } 
