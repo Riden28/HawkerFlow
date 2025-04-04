@@ -104,18 +104,30 @@ function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: any) => 
                   base: {
                     fontSize: '16px',
                     color: '#424770',
-                    fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif',
                     '::placeholder': {
                       color: '#aab7c4',
                     },
-                    backgroundColor: 'transparent',
+                    ':-webkit-autofill': {
+                      color: '#424770',
+                    },
                   },
                   invalid: {
                     color: '#9e2146',
                     iconColor: '#9e2146'
                   }
                 },
+                classes: {
+                  base: 'stripe-element',
+                  complete: 'stripe-element--complete',
+                  empty: 'stripe-element--empty',
+                  focus: 'stripe-element--focus',
+                  invalid: 'stripe-element--invalid',
+                  webkitAutofill: 'stripe-element--webkit-autofill'
+                },
                 hidePostalCode: true,
+                showIcon: true,
+                iconStyle: 'solid'
               }}
               className="w-full h-full"
             />
