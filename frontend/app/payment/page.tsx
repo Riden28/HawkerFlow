@@ -268,7 +268,7 @@ export default function PaymentPage() {
                       onValueChange={(value) => setPaymentMethod(value as "card" | "qr" | "cash")}
                       className="grid grid-cols-3 gap-4"
                     >
-                      <div>
+                      <div className="relative">
                         <RadioGroupItem value="card" id="card" className="peer sr-only" />
                         <Label
                           htmlFor="card"
@@ -278,7 +278,7 @@ export default function PaymentPage() {
                           <span className="text-sm font-medium">Credit Card</span>
                         </Label>
                       </div>
-                      <div>
+                      <div className="relative">
                         <RadioGroupItem value="qr" id="qr" className="peer sr-only" />
                         <Label
                           htmlFor="qr"
@@ -288,7 +288,7 @@ export default function PaymentPage() {
                           <span className="text-sm font-medium">QR Code</span>
                         </Label>
                       </div>
-                      <div>
+                      <div className="relative">
                         <RadioGroupItem value="cash" id="cash" className="peer sr-only" />
                         <Label
                           htmlFor="cash"
@@ -302,7 +302,9 @@ export default function PaymentPage() {
                   </div>
 
                   {paymentMethod === "card" && (
-                    <StripeTokenForm onTokenGenerated={handleCardTokenGenerated} />
+                    <div className="relative z-50">
+                      <StripeTokenForm onTokenGenerated={handleCardTokenGenerated} />
+                    </div>
                   )}
 
                   {paymentMethod === "qr" && (
