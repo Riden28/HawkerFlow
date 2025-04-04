@@ -64,15 +64,33 @@ export async function POST(request: Request) {
     const orderData = {
       userId: "user123",
       email: email,
-      stalls: uniqueStalls,
-      payment: {
-        token: token.id,
-        status: charge.status,
-        amount: orderSummary.total,
-        currency: "sgd"
+      stalls: {
+        [uniqueStalls[0] as string]: {
+          dishes: items.map((item: OrderItem) => ({
+            id: item.id,
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price
+          }))
+        }
       },
-      specialInstructions: specialInstructions || "",
-      orderId: charge.id
+      payment: {
+        createdAt: new Date().toISOString(),
+        email: email,
+        id: charge.id,
+        items: items.map((item: OrderItem) => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          stallName: item.stallName
+        })),
+        paymentMethod: "card",
+        specialInstructions: specialInstructions || "",
+        status: "ready_for_pickup",
+        token: token.id,
+        total: orderSummary.total
+      }
     }
 
     // Send the order data to the Python backend
