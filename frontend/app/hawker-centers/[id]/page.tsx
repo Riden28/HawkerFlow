@@ -1,16 +1,11 @@
 "use client"
-<<<<<<< Updated upstream
-import { useEffect, useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
-=======
 
-import { useState, use } from "react"
-import Link from "next/link"
-import { ArrowLeft, Clock, Users, Search, Filter, MapPin, Star } from "lucide-react"
->>>>>>> Stashed changes
+import { useState, use, useEffect } from "react"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Navbar } from "@/components/navbar"
 import Link from "next/link"
+import { ArrowLeft, Clock, Users, Search, Filter, MapPin, Star } from "lucide-react"
 
 interface Stall {
   stallName: string
@@ -20,27 +15,20 @@ interface Stall {
   stallPhoto?: string
 }
 
-export default function HawkerPage() {
+export default function HawkerCenterPage({ params }: { params: { id: string } }) {
+  const resolvedParams = use(Promise.resolve(params))
+  const centerId = Number.parseInt(resolvedParams.id)
   const [stalls, setStalls] = useState<Stall[]>([])
   const [waitTimes, setWaitTimes] = useState<{ [key: string]: number }>({})
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState("all")
 
-<<<<<<< Updated upstream
-  const hawkerName = "Maxwell Food Centre" // Hardcoded hawker center name
+  const hawkerName = "Maxwell Food Centre" // Hardcoded hawker center name for now
 
   useEffect(() => {
     const fetchStalls = async () => {
       const url = `/api/order-proxy/menu/${encodeURIComponent(hawkerName)}`
       console.log("📡 Calling proxy:", url)
-=======
-export default function HawkerCenterPage({ params }: { params: { id: string } }) {
-  const resolvedParams = use(Promise.resolve(params))
-  const centerId = Number.parseInt(resolvedParams.id)
-
-  const hawkerCenter = hawkerCenters.find((center) => center.id === centerId)
-  
-  const [activeTab, setActiveTab] = useState("all")
->>>>>>> Stashed changes
 
       try {
         const res = await fetch(url)
@@ -89,7 +77,14 @@ export default function HawkerCenterPage({ params }: { params: { id: string } })
     <div className="min-h-screen bg-background">
       <Navbar />
       <main className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-8">Stalls in {hawkerName}</h1>
+        <div className="flex items-center mb-6">
+          <Button variant="ghost" size="sm" onClick={() => window.history.back()} className="mr-2">
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back
+          </Button>
+          <h1 className="text-3xl font-bold">Stalls in {hawkerName}</h1>
+        </div>
+        
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {stalls.map((stall) => (
             <Card key={stall.stallName}>
