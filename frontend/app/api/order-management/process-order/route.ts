@@ -3,6 +3,21 @@ import Stripe from "stripe"
 import path from "path"
 import fs from "fs"
 
+interface OrderItem {
+  id: string
+  name: string
+  quantity: number
+  price: number
+  stallName: string
+  hawkerCenterName: string
+  waitTime: number
+  prepTime: number
+  image: string
+  options?: any[]
+  specialInstructions?: string
+}
+
+// Initialize Stripe with your secret key
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-02-24.acacia"
 })
@@ -10,56 +25,102 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    console.log("=== FINAL DATA SENT TO ORDERMGT ===")
-    console.log(body)
-    console.log("=== END OF ORDERMGT DATA ===")
+    console.log("Received request body:", body)
+    
+    const { email, token, items, specialInstructions, orderSummary } = body
 
-    const { stripeToken, token, email, items, specialInstructions, paymentMethod, total, orderSummary } = body
+    if (!email || !token || !items || !items.length) {
+      return NextResponse.json(
+        { success: false, message: "Missing required fields" },
+        { status: 400 }
+      )
+    }
 
-    // Create a charge using Stripe
+    console.log("Processing order with data:", {
+      email,
+      itemsCount: items.length,
+      specialInstructions,
+      orderSummary
+    })
+
+    // Process the payment with Stripe
     const charge = await stripe.charges.create({
-      amount: Math.round(total * 100), // Convert to cents
+      amount: Math.round(orderSummary.total * 100), // Convert to cents
       currency: "sgd",
-      source: stripeToken,
-      receipt_email: email,
+      source: token.id, // Use token.id instead of the whole token object
       description: `Order for ${email}`,
       metadata: {
-        order_items: JSON.stringify(items),
-        special_instructions: specialInstructions || "None"
+        email,
+        specialInstructions: specialInstructions || "None"
       }
     })
 
-    // Save order data to backend/orderMgt
-    const backendPath = path.resolve(process.cwd(), '..', 'backend', 'orderMgt')
-    if (!fs.existsSync(backendPath)) {
-      fs.mkdirSync(backendPath, { recursive: true })
-    }
+    console.log("Stripe charge created:", charge.id)
 
+    // Get unique stall names from items
+    const uniqueStalls = [...new Set(items.map((item: OrderItem) => item.stallName))]
+
+    // Prepare the order data to send to the backend
     const orderData = {
-      createdAt: new Date().toISOString(),
+      userId: "user123",
       email: email,
-      id: charge.id,
-      items: items,
-      paymentMethod: paymentMethod,
+      stalls: uniqueStalls,
+      payment: {
+        token: token.id,
+        status: charge.status,
+        amount: orderSummary.total,
+        currency: "sgd"
+      },
       specialInstructions: specialInstructions || "",
-      status: "ready_for_pickup",
-      token: token,
-      total: total,
-      orderSummary: orderSummary
+      orderId: charge.id
     }
 
-    const filePath = path.join(backendPath, `${charge.id}.json`)
-    await fs.promises.writeFile(filePath, JSON.stringify(orderData, null, 2))
+    // Send the order data to the Python backend
+    const backendUrl = "http://localhost:5555/order"
+    console.log("Sending order data to backend:", JSON.stringify(orderData, null, 2))
+    
+    try {
+      const response = await fetch(backendUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(orderData)
+      })
 
-    return NextResponse.json({
-      orderId: charge.id,
-      message: "Payment processed successfully"
-    })
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: response.statusText }))
+        console.error("Backend error response:", errorData)
+        throw new Error(`Backend error: ${errorData.message || response.statusText}`)
+      }
 
-  } catch (error: any) {
+      const backendResponse = await response.json()
+      console.log("Backend response:", backendResponse)
+
+      return NextResponse.json({
+        success: true,
+        orderId: charge.id,
+        message: "Order processed successfully",
+        backendResponse
+      })
+    } catch (backendError) {
+      console.error("Backend request failed:", backendError)
+      // Still return success since payment was processed
+      return NextResponse.json({
+        success: true,
+        orderId: charge.id,
+        message: "Payment processed successfully, but order notification failed",
+        error: backendError instanceof Error ? backendError.message : "Backend communication failed"
+      })
+    }
+
+  } catch (error) {
     console.error("Error processing order:", error)
     return NextResponse.json(
-      { message: error.message || "Failed to process order" },
+      { 
+        success: false, 
+        message: error instanceof Error ? error.message : "Failed to process order" 
+      },
       { status: 500 }
     )
   }
