@@ -107,11 +107,11 @@ function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: any) => 
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="space-y-2 relative">
+      <div className="space-y-2">
         <label htmlFor="card-element" className="text-sm font-medium">
           Card Details
         </label>
-        <div className="relative border rounded-md p-3 bg-white min-h-[40px] overflow-visible" style={{ zIndex: 100 }}>
+        <div className="border rounded-md p-3 bg-white">
           <CardElement
             id="card-element"
             options={{
@@ -131,9 +131,8 @@ function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: any) => 
                   iconColor: "#9e2146"
                 },
               },
-              hidePostalCode: true,
+              hidePostalCode: true
             }}
-            className="absolute inset-0 w-full h-full"
           />
         </div>
       </div>
@@ -141,7 +140,7 @@ function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: any) => 
       <Button 
         type="submit" 
         disabled={!stripe || loading || !isCardValid} 
-        className="w-full mt-4"
+        className="w-full"
       >
         {loading ? "Processing..." : "Submit Card Details"}
       </Button>
