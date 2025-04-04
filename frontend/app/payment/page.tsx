@@ -17,11 +17,11 @@ import StripeTokenForm from "@/components/stripe-form"
 export default function PaymentPage() {
   const router = useRouter()
   const { cart, clearCart } = useCart()
-  const [email, setEmail] = useState("")
+  const [phoneNumber, setPhoneNumber] = useState("")
   const [specialInstructions, setSpecialInstructions] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [paymentMethod, setPaymentMethod] = useState<"card" | "qr" | "cash">("card")
+  const [paymentMethod, setPaymentMethod] = useState<"card">("card")
   const [cardToken, setCardToken] = useState<any>(null)
   const [isCardValid, setIsCardValid] = useState(false)
   const [showSuccessMessage, setShowSuccessMessage] = useState(false)
@@ -37,8 +37,8 @@ export default function PaymentPage() {
   }
 
   const handlePayment = async () => {
-    if (!email) {
-      setError("Please enter your email for the receipt")
+    if (!phoneNumber) {
+      setError("Please enter your phone number for order updates")
       return
     }
 
@@ -74,7 +74,7 @@ export default function PaymentPage() {
       // Create the complete request data structure
       const requestData = {
         createdAt: new Date().toISOString(),
-        email,
+        phoneNumber,
         stripeToken: cardToken.id,
         token: {
           card: {
@@ -150,7 +150,7 @@ export default function PaymentPage() {
         id: data.orderId,
         items: orderItems,
         total: calculateTotal(),
-        email,
+        phoneNumber,
         specialInstructions,
         paymentMethod,
         status: "ready_for_pickup",
@@ -162,7 +162,7 @@ export default function PaymentPage() {
       console.log("=== FINAL DATA SENT TO ORDERMGMT ===")
       console.log({
         createdAt: new Date().toISOString(),
-        email,
+        phoneNumber,
         id: data.orderId,
         token: {
           card: cardToken.card,
@@ -246,15 +246,15 @@ export default function PaymentPage() {
               <CardContent>
                 <div className="space-y-6">
                   <div>
-                    <label htmlFor="email" className="block text-sm font-medium mb-2">
-                      Email for Receipt
+                    <label htmlFor="phone" className="block text-sm font-medium mb-2">
+                      Phone Number for Order Updates
                     </label>
                     <Input
-                      id="email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="Enter your email"
+                      id="phone"
+                      type="tel"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      placeholder="Enter your phone number"
                       required
                     />
                   </div>
@@ -265,8 +265,8 @@ export default function PaymentPage() {
                     </label>
                     <RadioGroup
                       value={paymentMethod}
-                      onValueChange={(value) => setPaymentMethod(value as "card" | "qr" | "cash")}
-                      className="grid grid-cols-3 gap-4"
+                      onValueChange={(value) => setPaymentMethod(value as "card")}
+                      className="grid grid-cols-1 gap-4"
                     >
                       <div>
                         <RadioGroupItem value="card" id="card" className="peer sr-only" />
@@ -278,47 +278,11 @@ export default function PaymentPage() {
                           <span className="text-sm font-medium">Credit Card</span>
                         </Label>
                       </div>
-                      <div>
-                        <RadioGroupItem value="qr" id="qr" className="peer sr-only" />
-                        <Label
-                          htmlFor="qr"
-                          className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-muted peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
-                        >
-                          <QrCode className="mb-2 h-6 w-6" />
-                          <span className="text-sm font-medium">QR Code</span>
-                        </Label>
-                      </div>
-                      <div>
-                        <RadioGroupItem value="cash" id="cash" className="peer sr-only" />
-                        <Label
-                          htmlFor="cash"
-                          className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-muted peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
-                        >
-                          <Banknote className="mb-2 h-6 w-6" />
-                          <span className="text-sm font-medium">Cash</span>
-                        </Label>
-                      </div>
                     </RadioGroup>
                   </div>
 
                   {paymentMethod === "card" && (
                     <StripeTokenForm onTokenGenerated={handleCardTokenGenerated} />
-                  )}
-
-                  {paymentMethod === "qr" && (
-                    <div className="text-center p-6">
-                      <QrCode className="w-48 h-48 mx-auto mb-4" />
-                      <p className="text-muted-foreground">Scan this QR code with your mobile payment app</p>
-                      <p className="font-medium mt-2">Amount: ${calculateTotal().toFixed(2)}</p>
-                    </div>
-                  )}
-
-                  {paymentMethod === "cash" && (
-                    <div className="text-center p-6">
-                      <Banknote className="w-24 h-24 mx-auto mb-4" />
-                      <p className="text-muted-foreground">Pay with cash upon food collection</p>
-                      <p className="font-medium mt-2">Amount to prepare: ${calculateTotal().toFixed(2)}</p>
-                    </div>
                   )}
 
                   <div>
@@ -344,10 +308,10 @@ export default function PaymentPage() {
                     disabled={
                       isProcessing || 
                       (paymentMethod === "card" && (!cardToken || !isCardValid)) ||
-                      !email
+                      !phoneNumber
                     }
                   >
-                    {isProcessing ? "Processing..." : `Pay ${paymentMethod === "cash" ? "Later" : "Now"}`}
+                    {isProcessing ? "Processing..." : "Pay Now"}
                   </Button>
                 </div>
               </CardContent>

@@ -1,6 +1,13 @@
 "use client"
+<<<<<<< Updated upstream
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
+=======
+
+import { useState, use } from "react"
+import Link from "next/link"
+import { ArrowLeft, Clock, Users, Search, Filter, MapPin, Star } from "lucide-react"
+>>>>>>> Stashed changes
 import { Button } from "@/components/ui/button"
 import { Navbar } from "@/components/navbar"
 import Link from "next/link"
@@ -18,12 +25,22 @@ export default function HawkerPage() {
   const [waitTimes, setWaitTimes] = useState<{ [key: string]: number }>({})
   const [loading, setLoading] = useState(true)
 
+<<<<<<< Updated upstream
   const hawkerName = "Maxwell Food Centre" // Hardcoded hawker center name
 
   useEffect(() => {
     const fetchStalls = async () => {
       const url = `/api/order-proxy/menu/${encodeURIComponent(hawkerName)}`
       console.log("📡 Calling proxy:", url)
+=======
+export default function HawkerCenterPage({ params }: { params: { id: string } }) {
+  const resolvedParams = use(Promise.resolve(params))
+  const centerId = Number.parseInt(resolvedParams.id)
+
+  const hawkerCenter = hawkerCenters.find((center) => center.id === centerId)
+  
+  const [activeTab, setActiveTab] = useState("all")
+>>>>>>> Stashed changes
 
       try {
         const res = await fetch(url)

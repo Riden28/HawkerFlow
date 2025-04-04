@@ -8,15 +8,17 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
 
-// Make sure we have the key
-const stripeKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-if (!stripeKey) {
-  console.error("Stripe publishable key is missing!")
+// Initialize Stripe with your publishable key
+const getStripe = () => {
+  const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+  if (!key) {
+    console.error("Stripe publishable key is missing!")
+    return null
+  }
+  return loadStripe(key)
 }
 
-// Initialize Stripe with your publishable key
-const stripePromise = loadStripe(stripeKey!)
-console.log("Stripe initialization status:", stripePromise ? "Success" : "Failed")
+const stripePromise = getStripe()
 
 // The form component that collects card details
 function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: any) => void }) {
@@ -27,48 +29,25 @@ function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: any) => 
   const [isCardValid, setIsCardValid] = useState(false)
 
   useEffect(() => {
-    // Log initialization status
-    console.log("Stripe available:", !!stripe)
-    console.log("Elements available:", !!elements)
-
     if (!stripe || !elements) {
-      setError("Payment system is initializing...")
       return
     }
 
     const cardElement = elements.getElement(CardElement)
     if (!cardElement) {
-      setError("Card element not found")
       return
     }
 
-    const handleChange = (event: any) => {
-      console.log("Card input change:", event.complete ? "complete" : "incomplete")
+    // Add change event listener to the card element
+    cardElement.on('change', (event) => {
       setIsCardValid(event.complete)
-      if (event.error) {
-        setError(event.error.message)
-        console.error("Card input error:", event.error)
-      } else {
-        setError(null)
-      }
-    }
-
-    cardElement.on('change', handleChange)
-    return () => {
-      cardElement.off('change', handleChange)
-    }
+      setError(event.error ? event.error.message : null)
+    })
   }, [stripe, elements])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
     if (!stripe || !elements) {
-      setError("Payment system not initialized")
-      return
-    }
-
-    if (!isCardValid) {
-      setError("Please enter valid card details")
       return
     }
 
@@ -81,101 +60,83 @@ function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: any) => 
         throw new Error("Card element not found")
       }
 
-      console.log("Creating token...")
-      const result = await stripe.createToken(cardElement)
-      console.log("Token creation result:", result)
-
-      if (result.error) {
-        throw result.error
+      const { token, error } = await stripe.createToken(cardElement)
+      
+      if (error) {
+        throw error
       }
 
-      if (!result.token) {
-        throw new Error("Failed to generate card token")
+      if (!token) {
+        throw new Error("Failed to create token")
       }
 
-      // Pass the complete token object to the parent component
-      onTokenGenerated(result.token)
-      toast.success("Card details verified!")
-    } catch (err: any) {
+      onTokenGenerated(token)
+    } catch (err) {
       console.error("Error creating token:", err)
-      setError(err.message || "An error occurred while processing your card")
-      toast.error(err.message || "An error occurred while processing your card")
+      setError(err instanceof Error ? err.message : "Failed to process payment")
+      toast.error("Payment failed", {
+        description: err instanceof Error ? err.message : "Failed to process payment"
+      })
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="space-y-2">
-        <label htmlFor="card-element" className="text-sm font-medium">
-          Card Details
-        </label>
-        <div className="border rounded-md p-3 bg-white">
-          <CardElement
-            id="card-element"
-            options={{
-              style: {
-                base: {
-                  fontSize: "16px",
-                  color: "#424770",
-                  fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
-                  fontSmoothing: "antialiased",
-                  "::placeholder": {
-                    color: "#aab7c4",
+    <form onSubmit={handleSubmit} className="w-full max-w-md mx-auto">
+      <Card>
+        <CardHeader>
+          <CardTitle>Card Details</CardTitle>
+          <CardDescription>Enter your card information to complete the payment</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="p-3 border rounded-md">
+              <CardElement
+                options={{
+                  style: {
+                    base: {
+                      fontSize: '16px',
+                      color: '#424770',
+                      '::placeholder': {
+                        color: '#aab7c4',
+                      },
+                    },
+                    invalid: {
+                      color: '#9e2146',
+                    },
                   },
-                  backgroundColor: "white",
-                },
-                invalid: {
-                  color: "#9e2146",
-                  iconColor: "#9e2146"
-                },
-              },
-              hidePostalCode: true
-            }}
-          />
-        </div>
-      </div>
-
-      <Button 
-        type="submit" 
-        disabled={!stripe || loading || !isCardValid} 
-        className="w-full"
-      >
-        {loading ? "Processing..." : "Submit Card Details"}
-      </Button>
-
-      {error && <div className="text-red-500 text-sm mt-2">{error}</div>}
+                }}
+              />
+            </div>
+            {error && (
+              <div className="text-red-500 text-sm">{error}</div>
+            )}
+          </div>
+        </CardContent>
+        <CardFooter>
+          <Button 
+            type="submit" 
+            className="w-full" 
+            disabled={!stripe || !elements || loading || !isCardValid}
+          >
+            {loading ? "Processing..." : "Pay Now"}
+          </Button>
+        </CardFooter>
+      </Card>
     </form>
   )
 }
 
-// The main component that wraps the form with Stripe Elements
+// The main component that provides the Stripe context
 export default function StripeTokenForm({ onTokenGenerated }: { onTokenGenerated: (token: any) => void }) {
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    return <div>Loading payment form...</div>
+  if (!stripePromise) {
+    return null
   }
 
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader>
-        <CardTitle>Payment Information</CardTitle>
-        <CardDescription>Enter your card details to create a Stripe token</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Elements stripe={stripePromise}>
-          <CheckoutForm onTokenGenerated={onTokenGenerated} />
-        </Elements>
-      </CardContent>
-      <CardFooter className="text-xs text-gray-500">
-        Your payment information is secured with Stripe.
-      </CardFooter>
-    </Card>
+    <Elements stripe={stripePromise}>
+      <CheckoutForm onTokenGenerated={onTokenGenerated} />
+    </Elements>
   )
 } 

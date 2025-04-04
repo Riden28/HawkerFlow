@@ -27,9 +27,9 @@ export async function POST(request: Request) {
     const body = await request.json()
     console.log("Received request body:", body)
     
-    const { email, token, items, specialInstructions, orderSummary } = body
+    const { phoneNumber, token, items, specialInstructions, orderSummary } = body
 
-    if (!email || !token || !items || !items.length) {
+    if (!phoneNumber || !token || !items || !items.length) {
       return NextResponse.json(
         { success: false, message: "Missing required fields" },
         { status: 400 }
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     }
 
     console.log("Processing order with data:", {
-      email,
+      phoneNumber,
       itemsCount: items.length,
       specialInstructions,
       orderSummary
@@ -47,10 +47,10 @@ export async function POST(request: Request) {
     const charge = await stripe.charges.create({
       amount: Math.round(orderSummary.total * 100), // Convert to cents
       currency: "sgd",
-      source: token.id, // Use token.id instead of the whole token object
-      description: `Order for ${email}`,
+      source: token.id,
+      description: `Order for ${phoneNumber}`,
       metadata: {
-        email,
+        phoneNumber,
         specialInstructions: specialInstructions || "None"
       }
     })
@@ -63,7 +63,8 @@ export async function POST(request: Request) {
     // Prepare the order data to send to the backend
     const orderData = {
       userId: "user123",
-      email: email,
+      phoneNumber: phoneNumber,
+      email: `${phoneNumber}@placeholder.com`,
       stalls: {
         [uniqueStalls[0] as string]: {
           dishes: items.map((item: OrderItem) => ({
@@ -76,7 +77,8 @@ export async function POST(request: Request) {
       },
       payment: {
         createdAt: new Date().toISOString(),
-        email: email,
+        phoneNumber: phoneNumber,
+        email: `${phoneNumber}@placeholder.com`,
         id: charge.id,
         items: items.map((item: OrderItem) => ({
           id: item.id,
@@ -87,7 +89,7 @@ export async function POST(request: Request) {
         })),
         paymentMethod: "card",
         specialInstructions: specialInstructions || "",
-        status: "ready_for_pickup",
+        status: "succeeded",
         token: token.id,
         total: orderSummary.total
       }
