@@ -153,19 +153,17 @@ def create_order():
             return jsonify({"error": "Invalid JSON payload"}), 400
 
         user_id = order_request.get("userId")
-        #changed email to phone number
-        phone_number = order_request.get("phoneNumber")
+        email = order_request.get("email")
         stalls_dict = order_request.get("stalls")
         payment_payload = order_request.get("payment")  # Payment payload as per sample structure
-        if user_id is None or phone_number is None or stalls_dict is None or payment_payload is None:
-            return jsonify({"error": "Missing required fields: userId, phone number, stalls, and payment are required."}), 400
+        if user_id is None or email is None or stalls_dict is None or payment_payload is None:
+            return jsonify({"error": "Missing required fields: userId, email, stalls, and payment are required."}), 400
 
         # Generate a unique order ID.
         order_id = f"order_{int(time.time())}"
         orders[order_id] = {
             "userId": user_id,
-            #change email to phone number
-            "phoneNumber": phone_number,
+            "email": email,
             "stalls": stalls_dict,
             "status": "pending"
         }
@@ -183,13 +181,10 @@ def create_order():
         # We forward the payment payload (which includes fields like createdAt, email, id, items, paymentMethod, token, total, etc.)
         try:
             payment_service_url = f"{PAYMENT_SERVICE_URL}/processPayment"
-            print(payment_payload)
             payment_resp = requests.post(payment_service_url, json=payment_payload, timeout=5)
             if payment_resp.status_code == 200:
                 payment_result = payment_resp.json()
-                print("success")
-                #changed status 200 to return success message (previously was failed)
-                payment_status = payment_result.get("paymentStatus", "success")
+                payment_status = payment_result.get("paymentStatus", "failed")
             else:
                 payment_status = "failed"
                 print(f"PAYMENT service responded with status code: {payment_resp.status_code}")
@@ -208,8 +203,7 @@ def create_order():
             order_details = {
                 "hawkerCentre": hawkerCenter,
                 "orderId": order_id,
-                #change email to phone number
-                "phoneNumber": phone_number,
+                "email": email,
                 "userId": user_id,
                 "paymentStatus": "paid",
                 "stalls": stalls_dict  # In a full implementation, detailed dish info could be included.
@@ -221,8 +215,7 @@ def create_order():
             notif_data = {
                 "orderId": order_id,
                 "userId": user_id,
-                #change email to phone number
-                "phoneNumber": phone_number,
+                "phoneNumber": email,  # Using email as a placeholder; replace with actual phone if available.
                 "orderStatus": "completed"
             }
             # Publish to Notification service using routing key "<orderId>.notif"
