@@ -260,5 +260,5 @@ def get_order_status(orderId):
 # Main - Run the Flask Application
 ###############################################################################
 if __name__ == "__main__":
-    # Run the Flask app on host 0.0.0.0 and port 5555.
-    app.run(host="0.0.0.0", port=5555, debug=True)
+    # Run the Flask app on host 0.0.0.0 and port 5003.
+    app.run(host="0.0.0.0", port=5003, debug=True)

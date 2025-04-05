@@ -99,4 +99,4 @@ def get_current_week_logs():
 
 if __name__ == '__main__':
     threading.Thread(target=run_consumer, daemon=True).start()
-    app.run(debug=True, host='0.0.0.0', port=5008)
+    app.run(debug=True, host='0.0.0.0', port=5004)
