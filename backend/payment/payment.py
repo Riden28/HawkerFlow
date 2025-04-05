@@ -18,14 +18,16 @@ stripe.api_key = os.environ.get("STRIPE_API_KEY")
 def payment():
     data = request.get_json()
 
-    payment_amount = data["amount"]
-    token = data["token"]
+    payment_amount = data.get("amount")
+    token = data.get("token")
+    id = token.get("id")
+    type = token.get("type")
 
     try:
     # Step 1: Create a PaymentMethod using the token
         payment_method = stripe.PaymentMethod.create(
-            type="card",
-            card={"token": token}  #card is the parameter in the stripe.PaymentMethod function --> points to token id 
+            type=type,
+            card={"token": id}  #card is the parameter in the stripe.PaymentMethod function --> points to token id 
         )
 
         # Step 2: Create a PaymentIntent with the created PaymentMethod
@@ -36,6 +38,7 @@ def payment():
             confirm=True, # Confirm the payment immediately
             automatic_payment_methods={"enabled": True, "allow_redirects": 'never'}
         )
+        print(payment_intent)
         # Return a success response
         return jsonify({
             "code": 200,
