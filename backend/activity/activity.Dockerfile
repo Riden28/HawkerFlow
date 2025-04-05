@@ -1,10 +1,5 @@
 # Use a lightweight base Python image
-FROM python:3.9-slim
-
-# Install system dependencies if needed (optional)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    # If you need any system packages, list them here.
-    && rm -rf /var/lib/apt/lists/*
+FROM python:3.12-slim
 
 # Set the working directory
 WORKDIR /app
@@ -17,7 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY activity.py .
 
 # Expose the port your Flask app runs on
-EXPOSE 5008
+EXPOSE 5004
 
 # Run the application
 CMD ["python", "activity.py"]

@@ -1,20 +1,18 @@
-# Use official Python base image
-FROM python:3.11-slim
+# Use a lightweight base Python image
+FROM python:3.12-slim
 
-# Set the working directory inside the container
+# Set a working directory
 WORKDIR /app
 
-# Copy the requirements file to leverage Docker caching
+# Copy in the requirements and install them
 COPY requirements.txt .
-
-# Install the Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the project files into the container
-COPY . .
+# Copy your order management script
+COPY orderMgt.py .
 
-# Expose the port that Flask will run on
-EXPOSE 5000
+# Expose the port Flask app is running on (for documentation)
+EXPOSE 5003
 
-# Command to run the Order Management service
-CMD ["python", "order_management.py"]
+# Define the default command to run service
+CMD ["python", "orderManagement.py"]

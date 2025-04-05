@@ -1,17 +1,17 @@
-# Use an official Python runtime as a parent image
-FROM python:3-slim
+# Use a lightweight base Python image
+FROM python:3.12-slim
 
-# Set the working directory in the container
-WORKDIR /usr/src/app
+# Set a working directory
+WORKDIR /app
 
-# Copy the current directory contents into the container at /usr/src/app
-COPY requirements.txt ./
+# Copy in the requirements and install them
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install any needed packages specified in requirements.txt
-RUN python -m pip install --no-cache-dir -r requirements.txt
+# Copy notification script into the container
+COPY notification.py .
 
-# Copy the current directory contents into the container at /usr/src/app
-COPY ./notification.py ./
+# By default, this service runs as a RabbitMQ consumer, so there's no need to EXPOSE a port
 
-# Run app.py when the container launches
-CMD ["python", "./notification.py"]
+# Set the default command to run the notification consumer
+CMD ["python", "notification.py"]
