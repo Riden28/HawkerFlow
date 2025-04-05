@@ -41,7 +41,7 @@ def process_order(ch, method, properties, body):
         # Loop through each stall
         for stall_name, data in orderDetails["stalls"].items():
             # Reference to the stall document
-            stall_ref = db.collection(orderDetails["hawkerCentre"]).document(stall_name)
+            stall_ref = db.collection(orderDetails["hawkerCenter"]).document(stall_name)
 
             # Ensure estimatedWaitTime is added if not present
             stall_doc = stall_ref.get()
@@ -269,7 +269,7 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
             #front end code here to update front ended
             #publish_message(f"{orderId}.customer", customer_data)
 
-            #deletes the order from db
+            #deletes the order from db 
             order_ref.delete()
 
             return jsonify({
@@ -305,7 +305,7 @@ orderDetails = {
         "used": False
     },
     "amount": 5.45,
-    "hawkerCentre": "maxwell Food centre",
+    "hawkerCenter": "maxwell Food centre",
     "orderId": "order_003",
     "phoneNumber": "+6512345678",
     "userId": "user_002",
@@ -316,6 +316,7 @@ orderDetails = {
             "name": "Fried Carrot Cake",
             "quantity": 1,
             "waitTime": 6
+            'price': 3.50
             }
         ]
         },
@@ -325,11 +326,13 @@ orderDetails = {
             "name": "Chicken Rice",
             "quantity": 2,
             "waitTime": 10
+            'price': 3.50
             },
             {
             "name": "Iced Tea",
             "quantity": 1,
             "waitTime": 2
+            'price': 3.50
             }
         ]
     }
