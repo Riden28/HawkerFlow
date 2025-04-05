@@ -1,16 +1,10 @@
 services:
   rabbitmq:
-    build:
-      context: ./rabbitmq
-      dockerfile: RabbitMQ.Dockerfile
+    image: rabbitmq:3-management
     container_name: rabbitmq
     ports:
       - "5672:5672"     # AMQP
       - "15672:15672"   # RabbitMQ UI
-    env_file:
-      - .env
-    volumes:
-      - ./hawkerflow-is213-firebase-adminsdk-fbsvc-5225881c2e.json:/app/firebase-cred.json
     environment:
       - RABBITMQ_DEFAULT_USER=guest
       - RABBITMQ_DEFAULT_PASS=guest
@@ -21,8 +15,8 @@ services:
       dockerfile: setup.Dockerfile
     depends_on:
       - rabbitmq
-    environment:
-      - RABBITMQ_HOST=rabbitmq
+    env_file:
+      - .env
     restart: on-failure
   
   queuemgt:

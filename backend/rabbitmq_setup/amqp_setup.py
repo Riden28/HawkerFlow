@@ -1,10 +1,25 @@
-import pika, os
+import pika, os, time
 
 amqp_host = os.environ.get("RABBITMQ_HOST", "rabbitmq")
 amqp_port = 5672
 order_exchange_name = "order_exchange"
 queue_exchange_name = "queue_exchange"
 exchange_type = "topic"
+
+def wait_for_rabbitmq(host, port, retries=10):
+    for i in range(retries):
+        try:
+            print(f"Attempt {i+1}: Connecting to {host}:{port}...")
+            connection = pika.BlockingConnection(pika.ConnectionParameters(host=host, port=port))
+            connection.close()
+            print("RabbitMQ is ready!")
+            return
+        except pika.exceptions.AMQPConnectionError:
+            print("RabbitMQ not ready yet. Retrying...")
+            time.sleep(3)
+    raise Exception("Failed to connect to RabbitMQ after multiple attempts")
+
+wait_for_rabbitmq(amqp_host, amqp_port)
 
 def create_exchange(hostname, port, exchange_name, exchange_type):
     print(f"Connecting to AMQP broker {hostname}:{port}...")
