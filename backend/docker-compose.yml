@@ -1,57 +1,79 @@
-version: "3.9"
-
 services:
   rabbitmq:
-    image: rabbitmq:3-management
+    build:
+      context: ./rabbitmq
+      dockerfile: RabbitMQ.Dockerfile
     container_name: rabbitmq
     ports:
-      - "5672:5672"   # for AMQP
-      - "15672:15672" # for RabbitMQ management UI
+      - "5672:5672"     # AMQP
+      - "15672:15672"   # RabbitMQ UI
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
-    networks:
-      - backend
 
-  queue_mgt:
+  queuemgt:
     build:
-      context: .
-      dockerfile: queueManagement.Dockerfile
-    container_name: queue_mgt
-    command: python queueMgt.py
+      context: ./queuemgt
+      dockerfile: queuemanagement.Dockerfile
     ports:
       - "5000:5000"
-    environment:
-      - FIREBASE_SERVICE_ACCOUNT_KEY_PATH=/run/secrets/firebase_key
-      - FIREBASE_PROJECT_ID=your-project-id
-    secrets:
-      - firebase_key
+    env_file:
+      - .env
+    volumes:
+      - ./hawkerflow-is213-firebase-adminsdk-fbsvc-5225881c2e.json:/secrets/firebase-service-account.json
     depends_on:
       - rabbitmq
-    networks:
-      - backend
+    environment:
+      - RABBITMQ_HOST=rabbitmq
 
-  notification:
+  menu:
     build:
-      context: .
-      dockerfile: notification.Dockerfile
-    container_name: notification
-    command: python notification.py
+      context: ./menu
+      dockerfile: menu.Dockerfile
     ports:
-      - "5001:5000"
-    environment:
-      - TWILIO_ACCOUNT_SID=your_sid
-      - TWILIO_AUTH_TOKEN=your_token
-      - TWILIO_PHONE_NUMBER=+65xxxxxxx
+      - "5001:5001"
+    env_file:
+      - .env
+    volumes:
+      - ./hawkerflow-is213-firebase-adminsdk-fbsvc-5225881c2e.json:/secrets/firebase-service-account.json
+
+  payment:
+    build:
+      context: ./payment
+      dockerfile: payment.Dockerfile
+    ports:
+      - "5002:5002"
+
+  ordermgt:
+    build:
+      context: ./ordermgt
+      dockerfile: ordermanagement.Dockerfile
+    ports:
+      - "5003:5003"
     depends_on:
       - rabbitmq
-    networks:
-      - backend
+    env_file:
+      - .env
+    volumes:
+      - ./hawkerflow-is213-firebase-adminsdk-fbsvc-5225881c2e.json:/secrets/firebase-service-account.json
+    environment:
+      - RABBITMQ_HOST=rabbitmq
 
-secrets:
-  firebase_key:
-    file: ./hawkerflow-key.json
+  activity:
+    build:
+      context: ./activity
+      dockerfile: activity.Dockerfile
+    ports:
+      - "5004:5004"
+    depends_on:
+      - rabbitmq
+    env_file:
+      - .env
+    volumes:
+      - ./hawkerflow-is213-firebase-adminsdk-fbsvc-5225881c2e.json:/secrets/firebase-service-account.json
+    environment:
+      - RABBITMQ_HOST=rabbitmq
 
 networks:
-  backend:
-    driver: bridge
+  default:
+    name: hawker-network

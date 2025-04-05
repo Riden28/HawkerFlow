@@ -1,6 +1,6 @@
-import pika
+import pika, os
 
-amqp_host = "localhost"
+RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST")
 amqp_port = 5672
 order_exchange_name = "order_exchange"
 queue_exchange_name = "queue_exchange"

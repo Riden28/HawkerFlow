@@ -9,10 +9,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy your order management script
-COPY orderMgt.py .
+COPY ordermanagement.py .
 
 # Expose the port Flask app is running on (for documentation)
 EXPOSE 5003
 
 # Define the default command to run service
-CMD ["python", "orderManagement.py"]
+CMD ["python", "ordermanagement.py"]

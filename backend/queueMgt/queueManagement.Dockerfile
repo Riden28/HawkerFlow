@@ -11,10 +11,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy project files into the container
-COPY queueMgt.py .
+COPY queuemanagement.py .
 
 # Expose Flask port
 EXPOSE 5000
 
 # Run the main script
-CMD ["python", "queueMgt.py"]
+CMD ["python", "queuemanagement.py"]
