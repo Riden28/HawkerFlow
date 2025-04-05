@@ -37,6 +37,8 @@ services:
       dockerfile: notification.Dockerfile
     container_name: notification
     command: python notification.py
+    ports:
+      - "5001:5000"
     environment:
       - TWILIO_ACCOUNT_SID=your_sid
       - TWILIO_AUTH_TOKEN=your_token
