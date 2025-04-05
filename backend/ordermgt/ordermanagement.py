@@ -14,7 +14,7 @@ app = Flask(__name__)
 # Environment-Based Configuration
 ###############################################################################
 # Base URLs for outbound REST calls to other microservices.
-MENU_SERVICE_URL = os.environ.get("MENU_SERVICE_URL", "http://menu:5001")
+MENU_SERVICE_URL = os.environ.get("MENU_SERVICE_URL", "http:/localhost/menu:5001")
 PAYMENT_SERVICE_URL = os.environ.get("PAYMENT_SERVICE_URL", "http://payment:5002")
 # (Queue and Notification services will be notified via RabbitMQ.)
 # RabbitMQ configuration for asynchronous messaging:
@@ -101,52 +101,6 @@ def get_menu_for_stall(hawkerCenter, hawkerStall):
 ###############################################################################
 @app.route("/order", methods=["POST"])
 def create_order():
-    """
-    POST /order
-    This composite endpoint now expects an orderRequest from the front end that includes both
-    order details and payment information. The expected JSON payload is:
-    
-    {
-      "userId": 123,
-      "email": "jane.doe@example.com",
-      "stalls": {
-          "Tian Tian Hainanese Chicken Rice": { "dishes": [0, 2] },
-          "Maxwell Fuzhou Oyster Cake": { "dishes": [0] }
-      },
-      "payment": {
-          "createdAt": "2025-04-02T14:51:38.831Z",
-          "email": "amberlyfong.2023@scis.smu.edu.sg",
-          "id": "ch_3R9SdhFKfP7LOez70mJaRIdm",
-          "items": [
-              {
-                  "id": 101,
-                  "name": "Chicken Rice",
-                  "quantity": 1,
-                  "price": 5.5,
-                  "stallName": "Ah Hock Chicken Rice"
-              }
-          ],
-          "paymentMethod": "card",
-          "specialInstructions": "",
-          "status": "ready_for_pickup",
-          "token": { ... },
-          "total": 5.45
-      }
-    }
-    
-    Steps:
-      1. Parse the incoming orderRequest and generate a unique orderId.
-      2. For each stall, optionally call the MENU microservice (GET /menu/<hawkerCenter>/<stallName>)
-         to verify dish details (if needed). In this implementation, we assume the payment info
-         already contains the total and details.
-      3. Forward the provided payment payload to the PAYMENT microservice via a POST /processPayment.
-         Outbound API Call: POST /processPayment on PAYMENT service with the full payment payload.
-      4. Update the order status based on the Payment response.
-      5. If payment is successful, asynchronously publish notifications via RabbitMQ:
-         - To Queue Management service using routing key: "<orderId>.queue"
-         - To Notification service using routing key: "<orderId>.notif"
-      6. Return the orderStatus to the UI.
-    """
     try:
         order_request = request.get_json()
         if not order_request:
@@ -155,24 +109,21 @@ def create_order():
         user_id = order_request.get("userId")
         phone_number = order_request.get("phoneNumber")
         stalls_dict = order_request.get("stalls")
-        payment_payload = order_request.get("payment")  # Payment payload as per sample structure
-        # if user_id is None or phone_number is None or stalls_dict is None or payment_payload is None:
-        #     return jsonify({"error": "Missing required fields: userId, phoneNumber, stalls, and payment are required."}), 400
-
-        # Generate a unique order ID.
-        order_id = f"order_{int(time.time())}"
-        orders[order_id] = {
-            "userId": user_id,
-            "phoneNumber": phone_number,
-            "stalls": stalls_dict,
-            "status": "pending"
-        }
+        token = order_request.get("token")
+        amount = order_request.get("amount")
+        hawker_center = order_request.get("hawkerCenter")
+        order_id = order_request.get("orderId")
         
-        # Hardcode hawkerCenter for demo purposes.
-        hawkerCenter = "Maxwell Food Centre"
+        if user_id is None or phone_number is None or stalls_dict is None or token is None or amount is None:
+            return jsonify({"error": "Missing required fields: userId, phoneNumber, stalls, token are required."}), 400
+        
+        payment_payload = {
+            "token":token,
+            "amount":amount
+        }
+        # json_payment_payload = json.dumps(payment_payload)
+        
 
-        # (Optional) You may call the MENU microservice to verify dish details for each stall.
-        # For this implementation, we assume the payment payload has already been validated by the front end.
 
         #######################################################################
         # Forward Payment Information to PAYMENT Microservice
@@ -193,9 +144,8 @@ def create_order():
         except Exception as e:
             print(f"Error calling PAYMENT microservice: {e}")
             payment_status = "failed"
-
-        # Update order status in our in-memory store.
-        orders[order_id]["status"] = payment_status
+        
+        
 
         #######################################################################
         # Publish Notifications via RabbitMQ (Asynchronous Messaging)
@@ -203,11 +153,11 @@ def create_order():
         if payment_status == "success":
             # Build order notification payload for Queue Management.
             order_details = {
-                "hawkerCentre": hawkerCenter,
+                "hawkerCenter": hawker_center,
                 "orderId": order_id,
                 "phoneNumber":phone_number,
                 "userId": user_id,
-                "paymentStatus": "paid",
+                "paymentStatus": payment_status,
                 "stalls": stalls_dict  # In a full implementation, detailed dish info could be included.
             }
             # Publish to Queue Management using routing key "<orderId>.queue"
