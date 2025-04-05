@@ -290,4 +290,4 @@ if __name__ == '__main__':
     if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
         threading.Thread(target=start_rabbitmq_consumer, daemon=True).start()
 
-    app.run(debug=True, port=5003, use_reloader=False)
+    app.run(debug=True, port=5000, use_reloader=False)
