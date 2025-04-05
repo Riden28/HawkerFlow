@@ -9,6 +9,7 @@ load_dotenv()
 
 app = Flask(__name__)
 
+
 # Retrieve environment variables for credentials and project
 service_account_path = os.environ.get("FIREBASE_SERVICE_ACCOUNT_KEY_PATH")
 project_id = os.environ.get("FIREBASE_PROJECT_ID")
