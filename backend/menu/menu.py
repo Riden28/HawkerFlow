@@ -32,8 +32,16 @@ def get_stalls_in_hawkercenter(hawkername):
     
     # 2) The stalls might be sub-documents, e.g. subcollection named "Stalls"
     # or, if the doc stores stall data directly, you'd do something different.
-    stalls_ref = hawker_doc_ref.collection("Stalls")  
-    docs = stalls_ref.stream()
+    # stalls_ref = hawker_doc_ref.collection("Stalls") 
+    # docs = stalls_ref.stream()
+    
+    try:
+        stalls_ref = hawker_doc_ref.collection("Stalls")
+        docs = stalls_ref.stream()
+    except Exception as e:
+        print("Firestore subcollection error:", e)  # or app.logger.error(...)
+        return jsonify({"error": str(e)}), 500
+    
     
     stalls = []
     for doc in docs:
