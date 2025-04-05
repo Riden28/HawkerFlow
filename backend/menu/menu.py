@@ -18,7 +18,9 @@ if not service_account_path or not project_id:
 # Create credentials from your service account JSON
 cred = service_account.Credentials.from_service_account_file(service_account_path)
 # Initialize the Firestore client
-db = firestore.Client(project=project_id, credentials=cred, database='menu')
+# db = firestore.Client(project=project_id, credentials=cred, database='menu')
+db = firestore.Client(project=project_id, credentials=cred)
+
 
 @app.route("/menu/<hawkername>", methods=["GET"])
 def get_stalls_in_hawkercenter(hawkername):
