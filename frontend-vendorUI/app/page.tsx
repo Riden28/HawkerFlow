@@ -18,6 +18,7 @@ import {
 import { VendorNavbar } from "@/components/vendor-navbar"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { formatTime } from "@/lib/utils"
 
 // Sample orders data for the vendor
 const orders = [
@@ -51,6 +52,7 @@ const orders = [
       },
     ],
     paymentMethod: "Credit Card",
+    estimatedTime: 15,
     orderNumber: 42,
   },
   {
@@ -92,6 +94,7 @@ const orders = [
       },
     ],
     paymentMethod: "PayNow",
+    estimatedTime: 20,
     orderNumber: 43,
   },
   {
@@ -121,6 +124,7 @@ const orders = [
       },
     ],
     paymentMethod: "Cash",
+    estimatedTime: 10,
     orderNumber: 44,
   },
   {
@@ -150,6 +154,7 @@ const orders = [
       },
     ],
     paymentMethod: "Credit Card",
+    estimatedTime: 25,
     orderNumber: 45,
   },
 ]
@@ -179,7 +184,7 @@ export default function VendorDashboard() {
           return {
             ...order,
             items: updatedItems,
-            status: allCompleted ? "completed" : order.status,
+            status: allCompleted ? "completed" : "pending",
           }
         }
         return order
@@ -342,9 +347,7 @@ export default function VendorDashboard() {
                               </Badge>
                             </CardTitle>
                             <CardDescription>
-                              {order.id} •{" "}
-                              {new Date(order.date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} •{" "}
-                              {order.customerName}
+                              {order.id} • {formatTime(order.date)} • {order.customerName}
                             </CardDescription>
                           </div>
                           <div className="flex items-center">
@@ -361,7 +364,7 @@ export default function VendorDashboard() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem onClick={() => handleOrderCompletion(order.id, true)}>
-                                  Mark All as Completed
+                                  Mark as Completed
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem>Print Order</DropdownMenuItem>
@@ -416,9 +419,6 @@ export default function VendorDashboard() {
                           ))}
                         </div>
                       </CardContent>
-                      <CardFooter className="flex justify-end pt-0">
-                        <Badge variant="default">Pending</Badge>
-                      </CardFooter>
                     </Card>
                   ))
               )}
@@ -452,9 +452,7 @@ export default function VendorDashboard() {
                               </Badge>
                             </CardTitle>
                             <CardDescription>
-                              {order.id} •{" "}
-                              {new Date(order.date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} •{" "}
-                              {order.customerName}
+                              {order.id} • {formatTime(order.date)} • {order.customerName}
                             </CardDescription>
                           </div>
                           <div className="flex items-center">
@@ -470,6 +468,10 @@ export default function VendorDashboard() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleOrderCompletion(order.id, false)}>
+                                  Mark as Pending
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
                                 <DropdownMenuItem>Print Order</DropdownMenuItem>
                                 <DropdownMenuItem>Contact Customer</DropdownMenuItem>
                               </DropdownMenuContent>
@@ -511,12 +513,6 @@ export default function VendorDashboard() {
                           ))}
                         </div>
                       </CardContent>
-                      <CardFooter className="flex justify-end pt-0">
-                        <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Completed
-                        </Badge>
-                      </CardFooter>
                     </Card>
                   ))
               )}

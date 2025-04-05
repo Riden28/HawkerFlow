@@ -2,10 +2,11 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { ChefHat, Menu, X } from "lucide-react"
+import { ChefHat, LayoutDashboard, Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { useState, useEffect } from "react"
+import { Separator } from "@/components/ui/separator"
 
 export function VendorNavbar() {
   const pathname = usePathname()
@@ -17,6 +18,16 @@ export function VendorNavbar() {
     setMounted(true)
   }, [])
 
+  const navItems = [
+    { href: "/", label: "Dashboard", icon: <LayoutDashboard className="h-5 w-5 mr-3" /> },
+  ]
+
+  const isActive = (path: string) => {
+    if (path === "/" && pathname === "/") return true
+    if (path !== "/" && pathname?.startsWith(path)) return true
+    return false
+  }
+
   return (
     <header className="bg-primary text-primary-foreground py-4 sticky top-0 z-50">
       <div className="container mx-auto px-4">
@@ -27,6 +38,21 @@ export function VendorNavbar() {
               HawkerFlow Vendor
             </Link>
           </h1>
+
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex space-x-6">
+            {navItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`hover:text-primary-foreground/80 font-medium transition-colors flex items-center ${
+                  isActive(item.href) ? "text-primary-foreground" : "text-primary-foreground/70"
+                }`}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
 
           {/* Mobile Navigation */}
           <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -41,12 +67,27 @@ export function VendorNavbar() {
                 <div className="flex justify-between items-center py-4">
                   <h2 className="text-lg font-semibold flex items-center">
                     <ChefHat className="h-5 w-5 mr-2" />
-                    Vendor Dashboard
+                    Vendor Menu
                   </h2>
                   <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
                     <X className="h-5 w-5" />
                   </Button>
                 </div>
+                <nav className="flex flex-col space-y-4 py-4">
+                  {navItems.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`text-lg py-2 flex items-center ${
+                        isActive(item.href) ? "font-medium" : "text-muted-foreground"
+                      }`}
+                      onClick={() => setIsOpen(false)}
+                    >
+                      {item.icon}
+                      {item.label}
+                    </Link>
+                  ))}
+                </nav>
               </div>
             </SheetContent>
           </Sheet>
