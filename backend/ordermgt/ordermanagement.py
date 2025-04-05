@@ -153,17 +153,17 @@ def create_order():
             return jsonify({"error": "Invalid JSON payload"}), 400
 
         user_id = order_request.get("userId")
-        email = order_request.get("email")
+        phone_number = order_request.get("phoneNumber")
         stalls_dict = order_request.get("stalls")
         payment_payload = order_request.get("payment")  # Payment payload as per sample structure
-        if user_id is None or email is None or stalls_dict is None or payment_payload is None:
-            return jsonify({"error": "Missing required fields: userId, email, stalls, and payment are required."}), 400
+        # if user_id is None or phone_number is None or stalls_dict is None or payment_payload is None:
+        #     return jsonify({"error": "Missing required fields: userId, phoneNumber, stalls, and payment are required."}), 400
 
         # Generate a unique order ID.
         order_id = f"order_{int(time.time())}"
         orders[order_id] = {
             "userId": user_id,
-            "email": email,
+            "phoneNumber": phone_number,
             "stalls": stalls_dict,
             "status": "pending"
         }
@@ -178,15 +178,17 @@ def create_order():
         # Forward Payment Information to PAYMENT Microservice
         #######################################################################
         # Outbound API Call: POST /processPayment on PAYMENT service.
-        # We forward the payment payload (which includes fields like createdAt, email, id, items, paymentMethod, token, total, etc.)
+        # We forward the payment payload (which includes fields like createdAt, phoneNumber, id, items, paymentMethod, token, total, etc.)
         try:
-            payment_service_url = f"{PAYMENT_SERVICE_URL}/processPayment"
+            payment_service_url = f"{PAYMENT_SERVICE_URL}/payment"
             payment_resp = requests.post(payment_service_url, json=payment_payload, timeout=5)
             if payment_resp.status_code == 200:
                 payment_result = payment_resp.json()
-                payment_status = payment_result.get("paymentStatus", "failed")
+                payment_data = payment_result.get("data")
+                payment_status = payment_data.get("status")
+                print(f"PAYMENT service responded with status code: {payment_resp.status_code}")
             else:
-                payment_status = "failed"
+                payment_status = payment_data.get("status")
                 print(f"PAYMENT service responded with status code: {payment_resp.status_code}")
         except Exception as e:
             print(f"Error calling PAYMENT microservice: {e}")
@@ -203,7 +205,7 @@ def create_order():
             order_details = {
                 "hawkerCentre": hawkerCenter,
                 "orderId": order_id,
-                "email": email,
+                "phoneNumber":phone_number,
                 "userId": user_id,
                 "paymentStatus": "paid",
                 "stalls": stalls_dict  # In a full implementation, detailed dish info could be included.
@@ -215,7 +217,7 @@ def create_order():
             notif_data = {
                 "orderId": order_id,
                 "userId": user_id,
-                "phoneNumber": email,  # Using email as a placeholder; replace with actual phone if available.
+                "phoneNumber": phone_number,
                 "orderStatus": "completed"
             }
             # Publish to Notification service using routing key "<orderId>.notif"
@@ -226,7 +228,7 @@ def create_order():
         #######################################################################
         return jsonify({
             "orderId": order_id,
-            "status": payment_status
+            "paymentStatus": payment_status
         }), 200
 
     except Exception as e:
