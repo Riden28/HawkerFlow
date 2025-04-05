@@ -1,11 +1,11 @@
 "use client"
 
-import { useState, use, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Navbar } from "@/components/navbar"
 import Link from "next/link"
-import { ArrowLeft, Clock, Users, Search, Filter, MapPin, Star } from "lucide-react"
+import { ArrowLeft } from "lucide-react"
 
 interface Stall {
   stallName: string
@@ -16,8 +16,10 @@ interface Stall {
 }
 
 export default function HawkerCenterPage({ params }: { params: { id: string } }) {
-  const resolvedParams = use(Promise.resolve(params))
+  // Remove the unsupported use(Promise.resolve(params)) call:
+  const resolvedParams = params
   const centerId = Number.parseInt(resolvedParams.id)
+
   const [stalls, setStalls] = useState<Stall[]>([])
   const [waitTimes, setWaitTimes] = useState<{ [key: string]: number }>({})
   const [loading, setLoading] = useState(true)
