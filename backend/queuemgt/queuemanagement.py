@@ -291,3 +291,47 @@ if __name__ == '__main__':
         threading.Thread(target=start_rabbitmq_consumer, daemon=True).start()
 
     app.run(debug=True, port=5000, use_reloader=False)
+
+
+orderDetails = {
+    "token": {
+        "card": {...},
+        "client_ip": '58.182.136.164',
+        "created": 1743752552,
+        "id": 'tok_1RA4tYFKfP7LOez7aq4SeSmC',
+        "livemode": False,
+        "object": 'token',
+        "type": 'card',
+        "used": False
+    },
+    "amount": 5.45,
+    "hawkerCentre": "maxwell Food centre",
+    "orderId": "order_003",
+    "phoneNumber": "+6512345678",
+    "userId": "user_002",
+    "stalls": {
+    "Maxwell Fuzhou Oyster Cake": {
+        "dishes": [
+            {
+            "name": "Fried Carrot Cake",
+            "quantity": 1,
+            "waitTime": 6
+            }
+        ]
+        },
+        "Tian Tian Hainanese Chicken Rice": {
+        "dishes": [
+            {
+            "name": "Chicken Rice",
+            "quantity": 2,
+            "waitTime": 10
+            },
+            {
+            "name": "Iced Tea",
+            "quantity": 1,
+            "waitTime": 2
+            }
+        ]
+    }
+    }
+}
