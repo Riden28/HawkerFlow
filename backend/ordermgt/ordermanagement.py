@@ -15,7 +15,7 @@ app = Flask(__name__)
 ###############################################################################
 # Base URLs for outbound REST calls to other microservices.
 MENU_SERVICE_URL = os.environ.get("MENU_SERVICE_URL", "http:/localhost/menu:5001")
-PAYMENT_SERVICE_URL = os.environ.get("PAYMENT_SERVICE_URL", "http://payment:5002")
+PAYMENT_SERVICE_URL = os.environ.get("PAYMENT_SERVICE_URL", "http:/localhost/payment:5002")
 # (Queue and Notification services will be notified via RabbitMQ.)
 # RabbitMQ configuration for asynchronous messaging:
 RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST", "localhost")
@@ -121,9 +121,6 @@ def create_order():
             "token":token,
             "amount":amount
         }
-        # json_payment_payload = json.dumps(payment_payload)
-        
-
 
         #######################################################################
         # Forward Payment Information to PAYMENT Microservice
