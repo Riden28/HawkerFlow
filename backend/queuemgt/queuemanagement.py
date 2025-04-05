@@ -1,7 +1,7 @@
 import os, pika, json, time
 import threading
 from dotenv import load_dotenv
-from flask import Flask, jsonify, abort, request
+from flask import Flask, jsonify, abort
 from google.cloud import firestore
 from google.oauth2 import service_account
 
@@ -22,12 +22,12 @@ cred = service_account.Credentials.from_service_account_file(service_account_pat
 db = firestore.Client(project=project_id, credentials=cred, database='queue')
 
 # RabbitMQ config
-RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST") #changeforDocker
+RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST")
 EXCHANGE_NAME = 'queue_exchange'
 QUEUE_NAME = 'O_queue'
+# print(RABBITMQ_HOST)
 connection = pika.BlockingConnection(pika.ConnectionParameters(RABBITMQ_HOST))
 channel = connection.channel()
-
 
 #consume=====================================================================================================================================
 
