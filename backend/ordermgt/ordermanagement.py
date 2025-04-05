@@ -64,40 +64,43 @@ def publish_message(routing_key: str, message: dict):
 ###############################################################################
 # 1) Composite Endpoints to Retrieve Stall Lists and Menu Items (Proxy Calls)
 ###############################################################################
-@app.route("/menu/<string:hawkerCenter>", methods=["GET"])
-def get_stalls_for_hawker_center(hawkerCenter):
-    """
-    GET /menu/<hawkerCenter>
-    Proxies the request to the MENU microservice to retrieve the list of stalls.
-    Outbound API Call: GET /menu/<hawkerCenter> on MENU service.
-    """
-    try:
-        url = f"{MENU_SERVICE_URL}/menu/{hawkerCenter}"
-        response = requests.get(url, timeout=5)
-        if response.status_code == 200:
-            return jsonify(response.json()), 200
-        else:
-            return jsonify({"error": f"Failed to retrieve stall list. Status code: {response.status_code}"}), response.status_code
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
+##############################################
+# Proxy GET /hawkerCenters
+##############################################
+@app.route("/hawkerCenters", methods=["GET"])
+def proxy_get_all_hawker_centers():
+    url = f"{MENU_SERVICE_URL}/hawkerCenters"
+    r = requests.get(url, timeout=5)
+    if r.status_code == 200:
+        return jsonify(r.json()), 200
+    else:
+        return jsonify({"error": f"Failed to retrieve hawker centers. Status code: {r.status_code}"}), r.status_code
 
-@app.route("/menu/<string:hawkerCenter>/<string:hawkerStall>", methods=["GET"])
-def get_menu_for_stall(hawkerCenter, hawkerStall):
-    """
-    GET /menu/<hawkerCenter>/<hawkerStall>
-    Proxies the request to the MENU microservice to retrieve the dish menu for a specific stall.
-    Outbound API Call: GET /menu/<hawkerCenter>/<hawkerStall> on MENU service.
-    """
-    try:
-        url = f"{MENU_SERVICE_URL}/menu/{hawkerCenter}/{hawkerStall}"
-        response = requests.get(url, timeout=5)
-        if response.status_code == 200:
-            return jsonify(response.json()), 200
-        else:
-            return jsonify({"error": f"Failed to retrieve menu items. Status code: {response.status_code}"}), response.status_code
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+##############################################
+# Proxy GET /hawkerCenters/<hawkerId>/stalls
+##############################################
+@app.route("/hawkerCenters/<string:hawkerId>/stalls", methods=["GET"])
+def proxy_get_stalls(hawkerId):
+    url = f"{MENU_SERVICE_URL}/hawkerCenters/{hawkerId}/stalls"
+    r = requests.get(url, timeout=5)
+    if r.status_code == 200:
+        return jsonify(r.json()), 200
+    else:
+        return jsonify({"error": f"Failed to retrieve stalls. Status code: {r.status_code}"}), r.status_code
+
+##############################################
+# Proxy GET /hawkerCenters/<hawkerId>/stalls/<stallId>/dishes
+##############################################
+@app.route("/hawkerCenters/<string:hawkerId>/stalls/<string:stallId>/dishes", methods=["GET"])
+def proxy_get_dishes(hawkerId, stallId):
+    url = f"{MENU_SERVICE_URL}/hawkerCenters/{hawkerId}/stalls/{stallId}/dishes"
+    r = requests.get(url, timeout=5)
+    if r.status_code == 200:
+        return jsonify(r.json()), 200
+    else:
+        return jsonify({"error": f"Failed to retrieve dishes. Status code: {r.status_code}"}), r.status_code
+
 
 ###############################################################################
 # 2) POST /order - Accept Orders, Forward Payment Payload, and Publish Notifications
