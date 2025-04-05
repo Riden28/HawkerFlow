@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { ChefHat, LayoutDashboard, ClipboardList, Settings, Menu, X, LogOut } from "lucide-react"
+import { ChefHat, LayoutDashboard, Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { useState, useEffect } from "react"
@@ -20,8 +20,6 @@ export function VendorNavbar() {
 
   const navItems = [
     { href: "/", label: "Dashboard", icon: <LayoutDashboard className="h-5 w-5 mr-3" /> },
-    { href: "/orders", label: "Orders", icon: <ClipboardList className="h-5 w-5 mr-3" /> },
-    { href: "/settings", label: "Settings", icon: <Settings className="h-5 w-5 mr-3" /> },
   ]
 
   const isActive = (path: string) => {
@@ -54,12 +52,6 @@ export function VendorNavbar() {
                 {item.label}
               </Link>
             ))}
-            <Button variant="secondary" size="sm" asChild>
-              <Link href="/">
-                <LogOut className="h-4 w-4 mr-2" />
-                Exit Vendor Mode
-              </Link>
-            </Button>
           </nav>
 
           {/* Mobile Navigation */}
@@ -95,15 +87,6 @@ export function VendorNavbar() {
                       {item.label}
                     </Link>
                   ))}
-                  <Separator className="my-2" />
-                  <Link
-                    href="/"
-                    className="text-lg py-2 flex items-center text-muted-foreground"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <LogOut className="h-5 w-5 mr-3" />
-                    Exit Vendor Mode
-                  </Link>
                 </nav>
               </div>
             </SheetContent>
