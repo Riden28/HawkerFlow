@@ -24,30 +24,27 @@ db = firestore.Client(project=project_id, credentials=cred)
 
 @app.route("/menu/<hawkername>", methods=["GET"])
 def get_stalls_in_hawkercenter(hawkername):
-    """
-    Returns all hawker stalls in the specified hawker center.
-    Each stall document includes the fields:
-      - category: string (e.g., "Chinese")
-      - description: string (e.g., "Specializing in traditional Fuzhou-style oyster cakes...")
-      - rating: number (e.g., 5)
-      - stallPhoto: string (storage link)
-    Example: /menu/Maxwell%20Food%20Center
-    """
-    # Query the collection named after the hawker center
-    stalls_ref = db.collection(hawkername)
+    # 1) Reference the "menu" collection
+    hawker_doc_ref = db.collection("menu").document(hawkername)
+    hawker_doc = hawker_doc_ref.get()
+    if not hawker_doc.exists:
+        return jsonify({"error": f"Hawker center '{hawkername}' not found."}), 404
+    
+    # 2) The stalls might be sub-documents, e.g. subcollection named "Stalls"
+    # or, if the doc stores stall data directly, you'd do something different.
+    stalls_ref = hawker_doc_ref.collection("Stalls")  
     docs = stalls_ref.stream()
-
+    
     stalls = []
     for doc in docs:
         stall_data = doc.to_dict()
-        # Include the stall name (document ID)
         stall_data["stallName"] = doc.id
         stalls.append(stall_data)
-    
+
     if not stalls:
-        return jsonify({"error": "Hawker center not found or no stalls available."}), 404
-    
+        return jsonify({"error": "No stalls available."}), 404
     return jsonify(stalls), 200
+
 
 @app.route("/menu/<hawkername>/<stallname>", methods=["GET"])
 def get_dishes_in_stall(hawkername, stallname):
