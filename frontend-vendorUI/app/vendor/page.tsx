@@ -428,16 +428,7 @@ export default function VendorDashboard() {
                           ))}
                         </div>
                       </CardContent>
-                      <CardFooter className="flex justify-between pt-0">
-                        <div className="flex items-center text-sm text-muted-foreground">
-                          <Clock className="h-4 w-4 mr-1" />
-                          Est. preparation: {order.estimatedTime} min
-                        </div>
-                        <Button variant="default" size="sm" onClick={() => handleOrderCompletion(order.id, true)}>
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Mark Order as Complete
-                        </Button>
-                      </CardFooter>
+                      
                     </Card>
                   ))
               )}
@@ -545,16 +536,7 @@ export default function VendorDashboard() {
                           ))}
                         </div>
                       </CardContent>
-                      <CardFooter className="flex justify-between pt-0">
-                        <div className="flex items-center text-sm text-muted-foreground">
-                          <Clock className="h-4 w-4 mr-1" />
-                          Est. preparation: {order.estimatedTime} min
-                        </div>
-                        <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Completed
-                        </Badge>
-                      </CardFooter>
+                  
                     </Card>
                   ))
               )}
@@ -660,23 +642,7 @@ export default function VendorDashboard() {
                         ))}
                       </div>
                     </CardContent>
-                    <CardFooter className="flex justify-between pt-0">
-                      <div className="flex items-center text-sm text-muted-foreground">
-                        <Clock className="h-4 w-4 mr-1" />
-                        Est. preparation: {order.estimatedTime} min
-                      </div>
-                      {order.status === "pending" ? (
-                        <Button variant="default" size="sm" onClick={() => handleOrderCompletion(order.id, true)}>
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Mark Order as Complete
-                        </Button>
-                      ) : (
-                        <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Completed
-                        </Badge>
-                      )}
-                    </CardFooter>
+                    
                   </Card>
                 ))
               )}
