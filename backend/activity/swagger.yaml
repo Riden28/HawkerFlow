@@ -1,0 +1,49 @@
+openapi: 3.0.0
+info:
+  title: Activity Logging Microservice API
+  version: 1.0.0
+  description: Provides access to time-tracked dish order logs per week from Firestore.
+
+servers:
+  - url: http://localhost:5008
+
+paths:
+  /activity/logs:
+    get:
+      summary: Get logs for the current week
+      description: Fetches all dish activity logs stored in Firestore for the current ISO week.
+      responses:
+        '200':
+          description: List of logs for the current week
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '500':
+          description: Server error retrieving current logs
+
+  /activity/logs/{week_id}:
+    get:
+      summary: Get logs for a specific week
+      description: Fetches dish logs for a specific ISO week ID (e.g., 2025-wk13)
+      parameters:
+        - name: week_id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: 2025-wk13
+          description: ISO week identifier to fetch logs from
+      responses:
+        '200':
+          description: Logs retrieved for the specified week
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '500':
+          description: Server error retrieving specified week's logs

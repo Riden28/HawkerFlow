@@ -1,0 +1,74 @@
+openapi: 3.0.0
+info:
+  title: Payment Microservice API
+  version: 1.0.0
+  description: API to process payments using Stripe tokens.
+
+servers:
+  - url: http://localhost:5002
+
+paths:
+  /payment:
+    post:
+      summary: Process a payment using a Stripe token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - amount
+                - token
+              properties:
+                amount:
+                  type: number
+                  format: float
+                  description: Amount to be charged (e.g., 12.50 for $12.50)
+                  example: 20.00
+                token:
+                  type: string
+                  description: Stripe token representing payment method
+                  example: tok_visa
+      responses:
+        '200':
+          description: Payment was successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: Payment successful
+                      status:
+                        type: string
+                        example: success
+                      paymentIntent:
+                        type: object
+                        description: Stripe PaymentIntent object
+        '400':
+          description: Payment failed due to card error or other issue
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 400
+                  data:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: Card declined
+                      status:
+                        type: string
+                        example: failed

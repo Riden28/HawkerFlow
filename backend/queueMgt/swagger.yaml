@@ -1,0 +1,110 @@
+openapi: 3.0.0
+info:
+  title: Queue Management API
+  description: API for managing hawker stall orders, wait times, and completions.
+  version: 1.0.0
+
+paths:
+  /{hawkerCenter}/{hawkerStall}/waitTime:
+    get:
+      summary: Get Estimated Wait Time
+      parameters:
+        - name: hawkerCenter
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: hawkerStall
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Estimated wait time returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hawkerCenter:
+                    type: string
+                  hawkerStall:
+                    type: string
+                  waitTime:
+                    type: integer
+        '404':
+          description: Stall not found or wait time not set
+        '500':
+          description: Internal server error
+
+  /{hawkerCenter}/{hawkerStall}/orders:
+    get:
+      summary: Get All Orders for a Stall
+      parameters:
+        - name: hawkerCenter
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: hawkerStall
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of orders
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+        '404':
+          description: Stall not found
+        '500':
+          description: Internal server error
+
+  /{hawkerCenter}/{hawkerStall}/orders/{orderId}/{dishName}/complete:
+    patch:
+      summary: Mark Dish as Completed
+      parameters:
+        - name: hawkerCenter
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: hawkerStall
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: dishName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Dish completed and wait time updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  orderId:
+                    type: string
+        '400':
+          description: Missing or invalid dish data
+        '404':
+          description: Order or stall not found
+        '500':
+          description: Internal server error

@@ -1,0 +1,24 @@
+openapi: 3.0.0
+info:
+  title: Menu Microservice API
+  version: 1.0.0
+  description: API for retrieving hawker stall and dish information, and updating wait times.
+
+servers:
+  - url: http://localhost:5001
+
+paths:
+  /menu/{hawkername}:
+    get:
+      summary: Get Stalls in Hawker Centre
+      parameters:
+        - name: hawkername
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Name of the hawker centre
+      responses:
+        '200':
+          description: A list of stalls
+          content:
