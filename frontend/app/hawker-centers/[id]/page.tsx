@@ -16,25 +16,22 @@ interface Stall {
 }
 
 export default function HawkerCenterPage({ params }: { params: Promise<{ id: string }> | { id: string } }) {
-  // Unwrap the params promise if needed.
+  // Always call hooks at the top level.
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null)
   useEffect(() => {
     (async () => {
-      // If params is a promise, await it; otherwise, use it directly.
       const p = params instanceof Promise ? await params : params
       setResolvedParams(p)
     })()
   }, [params])
 
-  // Until params are resolved, show a loading state.
-  if (!resolvedParams) return <div>Loading...</div>
-
-  const centerId = Number.parseInt(resolvedParams.id)
-
   const [stalls, setStalls] = useState<Stall[]>([])
   const [waitTimes, setWaitTimes] = useState<{ [key: string]: number }>({})
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("all")
+
+  // Compute centerId if resolvedParams is available
+  const centerId = resolvedParams ? Number.parseInt(resolvedParams.id) : null
 
   const hawkerName = "Maxwell Food Centre" // Hardcoded hawker center name for now
 
@@ -52,7 +49,7 @@ export default function HawkerCenterPage({ params }: { params: Promise<{ id: str
         if (Array.isArray(data)) {
           setStalls(data)
 
-          // Fetch wait time for each stall.
+          // 🔁 Fetch wait time for each stall
           const times: { [key: string]: number } = {}
           await Promise.all(
             data.map(async (stall: Stall) => {
@@ -82,50 +79,55 @@ export default function HawkerCenterPage({ params }: { params: Promise<{ id: str
     fetchStalls()
   }, [hawkerName])
 
-  if (loading) return <div className="p-8">Loading stalls...</div>
-
+  // Instead of returning early, conditionally render inside the JSX.
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-      <main className="container mx-auto px-4 py-8">
-        <div className="flex items-center mb-6">
-          <Button variant="ghost" size="sm" onClick={() => window.history.back()} className="mr-2">
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back
-          </Button>
-          <h1 className="text-3xl font-bold">Stalls in {hawkerName}</h1>
+    <>
+      {(!resolvedParams || loading) ? (
+        <div className="p-8">Loading...</div>
+      ) : (
+        <div className="min-h-screen bg-background">
+          <Navbar />
+          <main className="container mx-auto px-4 py-8">
+            <div className="flex items-center mb-6">
+              <Button variant="ghost" size="sm" onClick={() => window.history.back()} className="mr-2">
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Back
+              </Button>
+              <h1 className="text-3xl font-bold">Stalls in {hawkerName}</h1>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {stalls.map((stall) => (
+                <Card key={stall.stallName}>
+                  <div className="h-40 bg-gray-100">
+                    <img src={stall.stallPhoto || "/placeholder.svg"} alt={stall.stallName} className="w-full h-full object-cover" />
+                  </div>
+                  <CardHeader>
+                    <CardTitle>{stall.stallName}</CardTitle>
+                    <CardDescription>{stall.category}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">{stall.description}</p>
+                    <p className="text-sm text-blue-600 mt-2">
+                      Estimated Wait Time:{" "}
+                      {waitTimes[stall.stallName] === undefined
+                        ? "Loading..."
+                        : waitTimes[stall.stallName] === -1
+                        ? "Unavailable"
+                        : `${waitTimes[stall.stallName]} min`}
+                    </p>
+                  </CardContent>
+                  <CardFooter>
+                    <Button className="w-full" asChild>
+                      <Link href={`/hawker-centers/${encodeURIComponent(hawkerName)}/stalls/${encodeURIComponent(stall.stallName)}`}>View Menu</Link>
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          </main>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {stalls.map((stall) => (
-            <Card key={stall.stallName}>
-              <div className="h-40 bg-gray-100">
-                <img src={stall.stallPhoto || "/placeholder.svg"} alt={stall.stallName} className="w-full h-full object-cover" />
-              </div>
-              <CardHeader>
-                <CardTitle>{stall.stallName}</CardTitle>
-                <CardDescription>{stall.category}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">{stall.description}</p>
-                <p className="text-sm text-blue-600 mt-2">
-                  Estimated Wait Time:{" "}
-                  {waitTimes[stall.stallName] === undefined
-                    ? "Loading..."
-                    : waitTimes[stall.stallName] === -1
-                    ? "Unavailable"
-                    : `${waitTimes[stall.stallName]} min`}
-                </p>
-              </CardContent>
-              <CardFooter>
-                <Button className="w-full" asChild>
-                  <Link href={`/hawker-centers/${encodeURIComponent(hawkerName)}/stalls/${encodeURIComponent(stall.stallName)}`}>View Menu</Link>
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
-      </main>
-    </div>
+      )}
+    </>
   )
 }
