@@ -24,7 +24,6 @@ interface HawkerCenter {
   image?: string
   stallCount?: number
   popular?: boolean
-  distance?: string
   openingHours?: string
 }
 
@@ -124,11 +123,9 @@ export default function Home() {
             ))}
           </div>
         </section>
-        {/* Additional sections if needed */}
       </main>
       <footer className="bg-muted py-12">
         <div className="container mx-auto px-4">
-          {/* Footer content */}
           <div className="border-t border-border mt-8 pt-8 text-center text-muted-foreground">
             <p>© {new Date().getFullYear()} HawkerFlow. All rights reserved.</p>
           </div>

@@ -62,8 +62,18 @@ export default function StallsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {stalls.map((stall) => (
             <Card key={stall.stallId}>
+              <div className="relative h-48">
+                <img
+                  src={stall.stallPhoto || "/placeholder.svg"}
+                  alt={stall.stallName}
+                  className="w-full h-full object-cover"
+                />
+              </div>
               <CardHeader>
-                <CardTitle>{stall.stallName}</CardTitle>
+                <div className="flex justify-between items-center">
+                  <CardTitle>{stall.stallName}</CardTitle>
+                  <div className="text-sm font-bold">{stall.rating}</div>
+                </div>
                 <CardDescription>{stall.category}</CardDescription>
               </CardHeader>
               <CardContent>
