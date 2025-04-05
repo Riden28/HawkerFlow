@@ -96,7 +96,7 @@ export async function POST(request: Request) {
     }
 
     // Send the order data to the Python backend
-    const backendUrl = "http://localhost:5555/order"
+    const backendUrl = "http://localhost:5003/order"
     console.log("Sending order data to backend:", JSON.stringify(orderData, null, 2))
     
     try {
