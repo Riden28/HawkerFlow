@@ -15,9 +15,20 @@ interface Stall {
   stallPhoto?: string
 }
 
-export default function HawkerCenterPage({ params }: { params: { id: string } }) {
-  // Remove the unsupported use(Promise.resolve(params)) call:
-  const resolvedParams = params
+export default function HawkerCenterPage({ params }: { params: Promise<{ id: string }> | { id: string } }) {
+  // Unwrap the params promise if needed.
+  const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null)
+  useEffect(() => {
+    (async () => {
+      // If params is a promise, await it; otherwise, use it directly.
+      const p = params instanceof Promise ? await params : params
+      setResolvedParams(p)
+    })()
+  }, [params])
+
+  // Until params are resolved, show a loading state.
+  if (!resolvedParams) return <div>Loading...</div>
+
   const centerId = Number.parseInt(resolvedParams.id)
 
   const [stalls, setStalls] = useState<Stall[]>([])
@@ -36,12 +47,12 @@ export default function HawkerCenterPage({ params }: { params: { id: string } })
         const res = await fetch(url)
         console.log("📡 API response status:", res.status)
         const data = await res.json()
-        console.log("✅ stalls from proxy baby", data)
+        console.log("✅ stalls from proxy", data)
 
         if (Array.isArray(data)) {
           setStalls(data)
 
-          // 🔁 Fetch wait time for each stall
+          // Fetch wait time for each stall.
           const times: { [key: string]: number } = {}
           await Promise.all(
             data.map(async (stall: Stall) => {
@@ -49,7 +60,6 @@ export default function HawkerCenterPage({ params }: { params: { id: string } })
                 const res = await fetch(
                   `/api/wait-time?hawker=${encodeURIComponent(hawkerName)}&stall=${encodeURIComponent(stall.stallName)}`
                 )
-                
                 const json = await res.json()
                 times[stall.stallName] = json.waitTime
               } catch (err) {
@@ -59,7 +69,6 @@ export default function HawkerCenterPage({ params }: { params: { id: string } })
             })
           )
           setWaitTimes(times)
-
         } else {
           throw new Error("Response is not a valid array of stalls")
         }
@@ -86,7 +95,7 @@ export default function HawkerCenterPage({ params }: { params: { id: string } })
           </Button>
           <h1 className="text-3xl font-bold">Stalls in {hawkerName}</h1>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {stalls.map((stall) => (
             <Card key={stall.stallName}>
