@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
 import Stripe from "stripe"
-import path from "path"
-import fs from "fs"
+// Removed unused imports: path, fs
 
 interface OrderItem {
   id: string
@@ -29,9 +28,10 @@ export async function POST(request: Request) {
     
     const { phoneNumber, token, items, specialInstructions, orderSummary } = body
 
-    if (!phoneNumber || !token || !items || !items.length) {
+    // Validate required fields (including orderSummary)
+    if (!phoneNumber || !token || !items || !Array.isArray(items) || items.length === 0 || !orderSummary || typeof orderSummary.total !== 'number') {
       return NextResponse.json(
-        { success: false, message: "Missing required fields" },
+        { success: false, message: "Missing or invalid required fields" },
         { status: 400 }
       )
     }
@@ -59,14 +59,22 @@ export async function POST(request: Request) {
 
     // Get unique stall names from items
     const uniqueStalls = [...new Set(items.map((item: OrderItem) => item.stallName))]
+    if (uniqueStalls.length === 0) {
+      return NextResponse.json(
+        { success: false, message: "No stall information provided in items" },
+        { status: 400 }
+      )
+    }
 
     // Prepare the order data to send to the backend
     const orderData = {
       userId: "user123",
       phoneNumber: phoneNumber,
       email: `${phoneNumber}@placeholder.com`,
+      // This example uses only the first unique stall.
+      // Update as needed if multiple stalls should be handled.
       stalls: {
-        [uniqueStalls[0] as string]: {
+        [uniqueStalls[0]]: {
           dishes: items.map((item: OrderItem) => ({
             id: item.id,
             name: item.name,
@@ -144,4 +152,4 @@ export async function POST(request: Request) {
       { status: 500 }
     )
   }
-} 
+}
