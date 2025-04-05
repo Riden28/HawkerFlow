@@ -14,10 +14,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy your Python script into the container
-COPY menu.py .
+COPY activity.py .
 
 # Expose the port your Flask app runs on
-EXPOSE 5001
+EXPOSE 5008
 
 # Run the application
-CMD ["python", "menu.py"]
+CMD ["python", "activity.py"]
