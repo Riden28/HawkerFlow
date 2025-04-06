@@ -19,7 +19,7 @@ import { VendorNavbar } from "@/components/vendor-navbar"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { formatTime } from "@/lib/utils"
-import { getPendingOrders, getCompletedOrders, markDishComplete, type Order } from "@/lib/api"
+import { getPendingOrders, getCompletedOrders, markDishComplete, getStallsForHawkerCenter, type Order } from "@/lib/api"
 
 // Constants for the current hawker center and stall
 const HAWKER_ARRAY = [
@@ -28,8 +28,6 @@ const HAWKER_ARRAY = [
   "Maxwell Food Center",
   "Old Airport Road Food Center"
 ]
-const HAWKER_STALL = "Chicken Rice Stall"
-
 interface OrderDetails {
   quantity: number
   waitTime: number
@@ -84,8 +82,36 @@ export default function VendorDashboard() {
   const [orderData, setOrderData] = useState<ProcessedOrder[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
   const [selectedHawkerCenter, setSelectedHawkerCenter] = useState("Maxwell Food Center")
+  const [stallArray, setStallArray] = useState<string[]>([])
+  const [selectedStall, setSelectedStall] = useState("Chicken Rice Stall")
+
+  useEffect(() => {
+    async function fetchStalls() {
+      try {
+        const stalls = await getStallsForHawkerCenter(selectedHawkerCenter)
+        setStallArray(stalls)
+
+        // Set default stall if not already selected or if it's no longer in list
+        if (stalls.length > 0) {
+          setSelectedStall(stalls[0])
+          console.log(selectedStall) //this logs Chicken Rice Stall
+        } else {
+          setSelectedStall("") // fallback if no stalls
+        }
+
+        console.log("Fetched stalls:", stalls)
+      } catch (err) {
+        console.error("Failed to fetch stalls:", err)
+      }
+    }
+
+    fetchStalls()
+  }, [selectedHawkerCenter])
+
+  useEffect(() => {
+    console.log("Updated selectedStall:", selectedStall)
+  }, [selectedStall])
 
   // Fetch orders from the API
   useEffect(() => {
@@ -96,8 +122,8 @@ export default function VendorDashboard() {
 
         // Fetch both pending and completed orders
         const [pendingOrders, completedOrders] = await Promise.all([
-          getPendingOrders(selectedHawkerCenter, HAWKER_STALL),
-          getCompletedOrders(selectedHawkerCenter, HAWKER_STALL)
+          getPendingOrders(selectedHawkerCenter, selectedStall),
+          getCompletedOrders(selectedHawkerCenter, selectedStall)
         ])
 
         // Process pending orders
@@ -105,13 +131,13 @@ export default function VendorDashboard() {
           const order = rawOrder as ApiOrder
           const orderEntries = Object.entries(order)
 
-          console.log('Processing order:', orderId, 'Raw order data:', rawOrder)
+          // console.log('Processing order:', orderId, 'Raw order data:', rawOrder)
 
           const dishEntries = orderEntries.filter(([key, value]) => {
             return key !== 'userId' && key !== 'phoneNumber' && isOrderDetails(value)
           }) as [string, OrderDetails][]
 
-          console.log('Dish entries:', dishEntries)
+          // console.log('Dish entries:', dishEntries)
 
           // Get the first dish's time_started as the order time
           const firstDish = dishEntries[0]?.[1] as OrderDetails
@@ -119,11 +145,11 @@ export default function VendorDashboard() {
 
           const items = dishEntries.map(([dishName, details], itemIndex) => {
             const orderDetails = details as OrderDetails
-            console.log(`Raw order details for ${dishName}:`, {
-              details,
-              price: orderDetails.price,
-              quantity: orderDetails.quantity
-            })
+            // console.log(`Raw order details for ${dishName}:`, {
+            //   details,
+            //   price: orderDetails.price,
+            //   quantity: orderDetails.quantity
+            // })
             return {
               id: itemIndex + 1,
               name: dishName,
@@ -144,7 +170,7 @@ export default function VendorDashboard() {
             const price = typeof item.price === 'number' ? item.price : 0
             const quantity = typeof item.quantity === 'number' ? item.quantity : 0
             const itemTotal = price * quantity
-            console.log(`Total calculation for ${item.name}:`, { price, quantity, itemTotal })
+            // console.log(`Total calculation for ${item.name}:`, { price, quantity, itemTotal })
             return sum + itemTotal
           }, 0)
 
@@ -217,7 +243,7 @@ export default function VendorDashboard() {
     // Set up polling every 30 seconds
     const interval = setInterval(fetchOrders, 30000)
     return () => clearInterval(interval)
-  }, [selectedHawkerCenter])
+  }, [selectedHawkerCenter, selectedStall])
 
   // Filter orders based on search query
   const filteredOrders = orderData.filter((order) => {
@@ -236,7 +262,7 @@ export default function VendorDashboard() {
           itemName,
           originalName: itemName
         })
-        await markDishComplete(selectedHawkerCenter, HAWKER_STALL, orderId, itemName)
+        await markDishComplete(selectedHawkerCenter, selectedStall, orderId, itemName)
       }
 
       setOrderData((prevOrders) =>
@@ -273,7 +299,7 @@ export default function VendorDashboard() {
       // Mark all items as completed
       for (const item of order.items) {
         if (!item.completed && completed) {
-          await markDishComplete(selectedHawkerCenter, HAWKER_STALL, orderId, item.name)
+          await markDishComplete(selectedHawkerCenter, selectedStall, orderId, item.name)
         }
       }
 
@@ -367,22 +393,26 @@ export default function VendorDashboard() {
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="ml-2">
                   <Avatar className="h-8 w-8 mr-2">
-                    <AvatarFallback>{HAWKER_STALL.split(' ').map(word => word[0]).join('')}</AvatarFallback>
+                    <AvatarFallback>{selectedStall.split(" ").map(word => word[0]).join("")}</AvatarFallback>
                   </Avatar>
-                  {HAWKER_STALL}
+                  {selectedStall}
                   <ChevronDown className="ml-2 h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
+
               <DropdownMenuContent align="end">
-                <DropdownMenuLabel>My Stall</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>Profile</DropdownMenuItem>
-                <DropdownMenuItem>Settings</DropdownMenuItem>
-                <DropdownMenuItem>Help</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>Logout</DropdownMenuItem>
+                {stallArray.map((stallName) => (
+                  <DropdownMenuItem
+                    key={stallName}
+                    onClick={() => setSelectedStall(stallName)}
+                  >
+                    {stallName}
+                  </DropdownMenuItem>
+                ))}
               </DropdownMenuContent>
             </DropdownMenu>
+
+
           </div>
         </div>
 

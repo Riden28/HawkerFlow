@@ -41,8 +41,8 @@ hawker_centres = [
 ]
 
 stalls = {
-    "Chicken Rice Stall": ["Chicken Rice", "Roasted Chicken", "Egg", "Cucumber"],
-    "Noodle Stall": ["Fishball Noodles", "Laksa", "Wanton Mee"]
+    "Tian Tian Chicken Rice": ["Chicken Rice", "Roasted Chicken", "Egg", "Cucumber"],
+    "Ah Heng Curry Chicken Bee Hoon Mee": ["Fishball Noodles", "Laksa", "Wanton Mee"]
 }
 
 # 🔁 Create each hawker centre with 2 stalls and 4 orders each

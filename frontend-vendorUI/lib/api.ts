@@ -19,28 +19,7 @@ export interface Order {
   [key: string]: OrderItem | string // For dynamic dish names
 }
 //API Functions for orders
-export async function getHawkerCenterNames(): Promise<string[]> {
-  try {
-    const response = await fetch(`${API_BASE_URL_ORDER}/hawkerCenters`)
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch hawker centers')
-    }
-
-    const data = await response.json()
-
-    // Extract just the centerName values
-    const centerNames = data.map((center: any) => center.centerName.trim())
-
-    return centerNames
-  } catch (error) {
-    console.error('Error fetching hawker center names:', error)
-    throw error
-  }
-}
-
-
-export async function getStallsForHawkerCenter(hawkerId: string): Promise<any[]> {
+export async function getStallsForHawkerCenter(hawkerId: string): Promise<string[]> {
   try {
     const encodedId = encodeURIComponent(hawkerId)
     const response = await fetch(`${API_BASE_URL_ORDER}/hawkerCenters/${encodedId}/stalls`)
@@ -49,13 +28,17 @@ export async function getStallsForHawkerCenter(hawkerId: string): Promise<any[]>
       throw new Error('Failed to fetch stalls for hawker center')
     }
 
-    return await response.json()
+    const data = await response.json()
+
+    // Map to get only the stall names
+    const stallNames = data.map((stall: any) => stall.stallName?.trim())
+
+    return stallNames
   } catch (error) {
     console.error('Error fetching stalls:', error)
     throw error
   }
 }
-
 
 
 // API Functions
