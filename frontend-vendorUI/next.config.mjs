@@ -27,6 +27,16 @@ const nextConfig = {
     parallelServerBuildTraces: true,
     parallelServerCompiles: true,
   },
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://127.0.0.1:5000/:path*',
+        basePath: false,
+        locale: false
+      }
+    ]
+  }
 }
 
 if (userConfig) {

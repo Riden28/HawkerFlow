@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Bell, ChevronDown, Clock, Filter, MoreHorizontal, Search, CheckCircle, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -18,197 +18,122 @@ import {
 import { VendorNavbar } from "@/components/vendor-navbar"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { getPendingOrders, getCompletedOrders, markDishComplete, Order } from "@/lib/api"
 
-// Sample orders data for the vendor
-const orders = [
-  {
-    id: "HWK-1234",
-    customerName: "John Lee",
-    date: "2023-06-15T14:30:00",
-    status: "pending",
-    total: 15.5,
-    items: [
-      {
-        id: 1,
-        name: "Chicken Rice",
-        quantity: 1,
-        price: 5.5,
-        options: [
-          { name: "Meat Type", choice: "Steamed Chicken", price: 0 },
-          { name: "Rice Type", choice: "White Rice", price: 0 },
-        ],
-        specialInstructions: "Less oil please",
-        completed: false,
-      },
-      {
-        id: 2,
-        name: "Char Kway Teow",
-        quantity: 2,
-        price: 5.0,
-        options: [{ name: "Spice Level", choice: "Medium", price: 0 }],
-        specialInstructions: "",
-        completed: false,
-      },
-    ],
-    paymentMethod: "Credit Card",
-    estimatedTime: 15,
-    orderNumber: 42,
-  },
-  {
-    id: "HWK-1235",
-    customerName: "Sarah Tan",
-    date: "2023-06-15T14:35:00",
-    status: "pending",
-    total: 12.0,
-    items: [
-      {
-        id: 3,
-        name: "Laksa",
-        quantity: 1,
-        price: 7.0,
-        options: [
-          { name: "Spice Level", choice: "Extra Spicy", price: 0.5 },
-          { name: "Noodle Type", choice: "Thick Noodles", price: 0 },
-        ],
-        specialInstructions: "Extra cockles please",
-        completed: false,
-      },
-      {
-        id: 4,
-        name: "Teh Tarik",
-        quantity: 1,
-        price: 1.8,
-        options: [{ name: "Sweetness", choice: "Less Sweet", price: 0 }],
-        specialInstructions: "",
-        completed: true,
-      },
-      {
-        id: 5,
-        name: "Roti Prata",
-        quantity: 1,
-        price: 3.5,
-        options: [{ name: "Type", choice: "Plain", price: 0 }],
-        specialInstructions: "",
-        completed: false,
-      },
-    ],
-    paymentMethod: "PayNow",
-    estimatedTime: 20,
-    orderNumber: 43,
-  },
-  {
-    id: "HWK-1236",
-    customerName: "Michael Wong",
-    date: "2023-06-15T14:40:00",
-    status: "completed",
-    total: 8.5,
-    items: [
-      {
-        id: 6,
-        name: "Nasi Lemak",
-        quantity: 1,
-        price: 5.5,
-        options: [{ name: "Protein", choice: "Fried Chicken", price: 1.0 }],
-        specialInstructions: "Extra sambal",
-        completed: true,
-      },
-      {
-        id: 7,
-        name: "Iced Milo",
-        quantity: 1,
-        price: 2.0,
-        options: [],
-        specialInstructions: "",
-        completed: true,
-      },
-    ],
-    paymentMethod: "Cash",
-    estimatedTime: 10,
-    orderNumber: 44,
-  },
-  {
-    id: "HWK-1237",
-    customerName: "Lisa Chen",
-    date: "2023-06-15T14:45:00",
-    status: "pending",
-    total: 22.0,
-    items: [
-      {
-        id: 8,
-        name: "Hokkien Mee",
-        quantity: 2,
-        price: 6.0,
-        options: [{ name: "Size", choice: "Large", price: 1.0 }],
-        specialInstructions: "",
-        completed: false,
-      },
-      {
-        id: 9,
-        name: "Satay",
-        quantity: 10,
-        price: 1.0,
-        options: [{ name: "Meat", choice: "Mixed (Chicken & Beef)", price: 0 }],
-        specialInstructions: "Extra peanut sauce",
-        completed: false,
-      },
-    ],
-    paymentMethod: "Credit Card",
-    estimatedTime: 25,
-    orderNumber: 45,
-  },
-]
+interface OrderWithId extends Order {
+  id: string;
+  customerName?: string;
+  status?: "pending" | "completed";
+  items?: Array<{
+    id: number;
+    name: string;
+    completed: boolean;
+    quantity: number;
+    price: number;
+    options?: Array<{
+      name: string;
+      choice: string;
+      price: number;
+    }>;
+    specialInstructions?: string;
+  }>;
+  total?: number;
+  paymentMethod?: string;
+}
 
 export default function VendorDashboard() {
-  // Remove the activeTab state since we're using the Tabs component's built-in state management
+  const [hawkerCenter] = useState("Maxwell Food Center")
+  const [hawkerStall] = useState("Chicken Rice Stall")
   const [searchQuery, setSearchQuery] = useState("")
-  const [orderData, setOrderData] = useState(orders)
+  const [pendingOrders, setPendingOrders] = useState<OrderWithId[]>([])
+  const [completedOrders, setCompletedOrders] = useState<OrderWithId[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
-  // Filter orders based on active tab and search query
-  const filteredOrders = orderData.filter((order) => {
+  // Fetch orders when component mounts
+  useEffect(() => {
+    fetchOrders()
+  }, [hawkerCenter, hawkerStall])
+
+  const fetchOrders = async () => {
+    try {
+      setLoading(true)
+      setError("")
+      
+      // Fetch both pending and completed orders
+      const [pending, completed] = await Promise.all([
+        getPendingOrders(hawkerCenter, hawkerStall),
+        getCompletedOrders(hawkerCenter, hawkerStall)
+      ])
+
+      // Transform pending orders
+      setPendingOrders(
+        Object.entries(pending).map(([id, order]) => ({
+          ...order,
+          id,
+          status: "pending" as const
+        }))
+      )
+
+      // Transform completed orders
+      setCompletedOrders(
+        Object.entries(completed).map(([id, order]) => ({
+          ...order,
+          id,
+          status: "completed" as const
+        }))
+      )
+    } catch (err) {
+      console.error("Error fetching orders:", err)
+      setError("Failed to fetch orders")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Combine orders for filtering
+  const filteredOrders = [...pendingOrders, ...completedOrders].filter((order) => {
     const matchesSearch =
       order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.customerName.toLowerCase().includes(searchQuery.toLowerCase())
+      (order.customerName?.toLowerCase() || "").includes(searchQuery.toLowerCase())
     return matchesSearch
   })
 
   // Handle marking an item as completed
-  const handleItemCompletion = (orderId: string, itemId: number, completed: boolean) => {
-    setOrderData((prevOrders) =>
-      prevOrders.map((order) => {
-        if (order.id === orderId) {
-          const updatedItems = order.items.map((item) => (item.id === itemId ? { ...item, completed } : item))
-
-          // Check if all items are completed
-          const allCompleted = updatedItems.every((item) => item.completed)
-
-          return {
-            ...order,
-            items: updatedItems,
-            status: allCompleted ? "completed" : "pending",
-          }
-        }
-        return order
-      }),
-    )
+  const handleItemCompletion = async (orderId: string, dishName: string, completed: boolean) => {
+    try {
+      if (completed) {
+        await markDishComplete(hawkerCenter, hawkerStall, orderId, dishName)
+      }
+      // Refresh orders after marking complete
+      await fetchOrders()
+    } catch (err) {
+      console.error("Error marking dish as complete:", err)
+      setError("Failed to update dish status")
+    }
   }
 
   // Handle marking an entire order as completed
-  const handleOrderCompletion = (orderId: string, completed: boolean) => {
-    setOrderData((prevOrders) =>
-      prevOrders.map((order) => {
-        if (order.id === orderId) {
-          const updatedItems = order.items.map((item) => ({ ...item, completed }))
-
-          return {
-            ...order,
-            items: updatedItems,
-            status: completed ? "completed" : "pending",
+  const handleOrderCompletion = async (orderId: string, completed: boolean) => {
+    try {
+      const order = pendingOrders.find(o => o.id === orderId) || completedOrders.find(o => o.id === orderId)
+      if (order && order.items) {
+        // Mark all items as complete
+        for (const item of order.items) {
+          if (!item.completed) {
+            await markDishComplete(hawkerCenter, hawkerStall, orderId, item.name)
           }
         }
-        return order
-      }),
-    )
+        await fetchOrders()
+      }
+    } catch (err) {
+      console.error("Error completing order:", err)
+      setError("Failed to complete order")
+    }
   }
+
+  if (loading) return <div>Loading orders...</div>
+  if (error) return <div>Error: {error}</div>
 
   return (
     <div className="min-h-screen bg-background">
@@ -256,11 +181,11 @@ export default function VendorDashboard() {
               <CardTitle className="text-sm font-medium">Pending Orders</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{orderData.filter((order) => order.status === "pending").length}</div>
+              <div className="text-2xl font-bold">
+                {pendingOrders.length}
+              </div>
               <p className="text-xs text-muted-foreground">
-                {orderData
-                  .filter((order) => order.status === "pending")
-                  .reduce((acc, order) => acc + order.items.length, 0)}{" "}
+                {pendingOrders.reduce((acc, order) => acc + (order.items?.length || 0), 0)}{" "}
                 items to prepare
               </p>
             </CardContent>
@@ -271,12 +196,10 @@ export default function VendorDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {orderData.filter((order) => order.status === "completed").length}
+                {completedOrders.length}
               </div>
               <p className="text-xs text-muted-foreground">
-                {orderData
-                  .filter((order) => order.status === "completed")
-                  .reduce((acc, order) => acc + order.items.length, 0)}{" "}
+                {completedOrders.reduce((acc, order) => acc + (order.items?.length || 0), 0)}{" "}
                 items prepared
               </p>
             </CardContent>
@@ -288,9 +211,7 @@ export default function VendorDashboard() {
             <CardContent>
               <div className="text-2xl font-bold">
                 $
-                {orderData
-                  .filter((order) => order.status === "completed")
-                  .reduce((total, order) => total + order.total, 0)
+                {completedOrders.reduce((total, order) => total + (order.total || 0), 0)
                   .toFixed(2)}
               </div>
               <p className="text-xs text-muted-foreground">
@@ -327,7 +248,7 @@ export default function VendorDashboard() {
 
           <TabsContent value="pending" className="mt-0">
             <div className="space-y-4">
-              {filteredOrders.filter((order) => order.status === "pending").length === 0 ? (
+              {pendingOrders.length === 0 ? (
                 <Card>
                   <CardContent className="flex flex-col items-center justify-center py-10">
                     <div className="rounded-full bg-muted p-3 mb-3">
@@ -348,20 +269,20 @@ export default function VendorDashboard() {
                         <div className="flex justify-between items-start">
                           <div>
                             <CardTitle className="text-lg flex items-center">
-                              Order #{order.orderNumber}
+                              Order #{order.id}
                               <Badge className="ml-2" variant="default">
                                 Pending
                               </Badge>
                             </CardTitle>
-                            <CardDescription>
-                              {order.id} •{" "}
-                              {new Date(order.date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} •{" "}
-                              {order.customerName}
-                            </CardDescription>
+                            {/* <CardDescription> */}
+                              {/* {order.id} •{" "} */}
+                              {/* {new Date(order.date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} •{" "} */}
+                              {/* {order.customerName} */}
+                            {/* </CardDescription> */}
                           </div>
                           <div className="flex items-center">
                             <div className="text-right mr-4">
-                              <p className="font-medium">${order.total.toFixed(2)}</p>
+                              <p className="font-medium">${order.total?.toFixed(2) || ""}</p>
                               <p className="text-xs text-muted-foreground">{order.paymentMethod}</p>
                             </div>
                             <DropdownMenu>
@@ -385,14 +306,14 @@ export default function VendorDashboard() {
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-2">
-                          {order.items.map((item) => (
+                          {order.items?.map((item) => (
                             <div key={item.id} className="flex items-start py-2">
                               <Checkbox
                                 id={`item-${item.id}`}
                                 className="mt-1 mr-3"
                                 checked={item.completed}
                                 onCheckedChange={(checked) =>
-                                  handleItemCompletion(order.id, item.id, checked as boolean)
+                                  handleItemCompletion(order.id, item.name, checked as boolean)
                                 }
                               />
                               <div className="flex-1">
@@ -469,7 +390,7 @@ export default function VendorDashboard() {
                           </div>
                           <div className="flex items-center">
                             <div className="text-right mr-4">
-                              <p className="font-medium">${order.total.toFixed(2)}</p>
+                              <p className="font-medium">${order.total?.toFixed(2) || ""}</p>
                               <p className="text-xs text-muted-foreground">{order.paymentMethod}</p>
                             </div>
                             <DropdownMenu>
@@ -493,14 +414,14 @@ export default function VendorDashboard() {
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-2">
-                          {order.items.map((item) => (
+                          {order.items?.map((item) => (
                             <div key={item.id} className="flex items-start py-2">
                               <Checkbox
                                 id={`item-${item.id}`}
                                 className="mt-1 mr-3"
                                 checked={item.completed}
                                 onCheckedChange={(checked) =>
-                                  handleItemCompletion(order.id, item.id, checked as boolean)
+                                  handleItemCompletion(order.id, item.name, checked as boolean)
                                 }
                               />
                               <div className="flex-1">
@@ -575,7 +496,7 @@ export default function VendorDashboard() {
                         </div>
                         <div className="flex items-center">
                           <div className="text-right mr-4">
-                            <p className="font-medium">${order.total.toFixed(2)}</p>
+                            <p className="font-medium">${order.total?.toFixed(2) || ""}</p>
                             <p className="text-xs text-muted-foreground">{order.paymentMethod}</p>
                           </div>
                           <DropdownMenu>
@@ -587,7 +508,7 @@ export default function VendorDashboard() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem
-                                onClick={() => handleOrderCompletion(order.id, !order.status === "completed")}
+                                onClick={() => handleOrderCompletion(order.id, order.status !== "completed")}
                               >
                                 {order.status === "completed" ? "Mark All as Pending" : "Mark All as Completed"}
                               </DropdownMenuItem>
@@ -601,13 +522,13 @@ export default function VendorDashboard() {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-2">
-                        {order.items.map((item) => (
+                        {order.items?.map((item) => (
                           <div key={item.id} className="flex items-start py-2">
                             <Checkbox
                               id={`item-${item.id}`}
                               className="mt-1 mr-3"
                               checked={item.completed}
-                              onCheckedChange={(checked) => handleItemCompletion(order.id, item.id, checked as boolean)}
+                              onCheckedChange={(checked) => handleItemCompletion(order.id, item.name, checked as boolean)}
                             />
                             <div className="flex-1">
                               <div className="flex justify-between">
@@ -653,4 +574,6 @@ export default function VendorDashboard() {
     </div>
   )
 }
+
+
 
