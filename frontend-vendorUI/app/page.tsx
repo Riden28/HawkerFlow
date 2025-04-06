@@ -29,6 +29,9 @@ interface OrderDetails {
   quantity: number
   waitTime: number
   completed: boolean
+  time_started: string
+  time_completed: string | null
+  price: number
 }
 
 interface ApiOrder {
@@ -41,6 +44,7 @@ interface ProcessedOrder {
   id: string
   customerName: string
   date: string
+  timeStarted: string | null
   status: "pending" | "completed"
   total: number
   items: {
@@ -48,7 +52,10 @@ interface ProcessedOrder {
     name: string
     quantity: number
     waitTime: number
+    price: number
     completed: boolean
+    timeStarted: string | null
+    timeCompleted: string | null
     specialInstructions?: string
   }[]
   paymentMethod: string
@@ -61,7 +68,9 @@ function isOrderDetails(value: unknown): value is OrderDetails {
     value !== null &&
     'completed' in value &&
     'quantity' in value &&
-    'waitTime' in value
+    'waitTime' in value &&
+    'time_started' in value &&
+    'price' in value
   )
 }
 
@@ -88,25 +97,57 @@ export default function VendorDashboard() {
         const processedPendingOrders: ProcessedOrder[] = Object.entries(pendingOrders).map(([orderId, rawOrder], index) => {
           const order = rawOrder as ApiOrder
           const orderEntries = Object.entries(order)
+          
+          console.log('Processing order:', orderId, 'Raw order data:', rawOrder)
+          
           const dishEntries = orderEntries.filter(([key, value]) => {
             return key !== 'userId' && key !== 'phoneNumber' && isOrderDetails(value)
           }) as [string, OrderDetails][]
 
-          const items = dishEntries.map(([dishName, details], itemIndex) => ({
-            id: itemIndex + 1,
-            name: dishName,
-            quantity: details.quantity,
-            waitTime: details.waitTime,
-            completed: details.completed,
-            specialInstructions: "",
-          }))
+          console.log('Dish entries:', dishEntries)
+
+          // Get the first dish's time_started as the order time
+          const firstDish = dishEntries[0]?.[1] as OrderDetails
+          console.log('First dish details:', firstDish)
+
+          const items = dishEntries.map(([dishName, details], itemIndex) => {
+            const orderDetails = details as OrderDetails
+            console.log(`Raw order details for ${dishName}:`, {
+              details,
+              price: orderDetails.price,
+              quantity: orderDetails.quantity
+            })
+            return {
+              id: itemIndex + 1,
+              name: dishName,
+              quantity: orderDetails.quantity || 0,
+              waitTime: orderDetails.waitTime || 0,
+              price: typeof orderDetails.price === 'number' ? orderDetails.price : 0,
+              completed: orderDetails.completed || false,
+              timeStarted: orderDetails.time_started,
+              timeCompleted: orderDetails.time_completed,
+              specialInstructions: "",
+            }
+          })
+
+          // Get the raw time_started value from the first dish
+          const rawTimeStarted = firstDish?.time_started || null
+
+          const calculatedTotal = items.reduce((sum, item) => {
+            const price = typeof item.price === 'number' ? item.price : 0
+            const quantity = typeof item.quantity === 'number' ? item.quantity : 0
+            const itemTotal = price * quantity
+            console.log(`Total calculation for ${item.name}:`, { price, quantity, itemTotal })
+            return sum + itemTotal
+          }, 0)
 
           return {
-            id: orderId.replace(/ /g, '_'),
+            id: orderId,
             customerName: `Customer ${order.phoneNumber}`,
-            date: new Date().toISOString(),
+            date: rawTimeStarted || new Date().toISOString(),
+            timeStarted: rawTimeStarted,
             status: "pending" as const,
-            total: items.reduce((sum, item) => sum + (item.waitTime * item.quantity), 0),
+            total: calculatedTotal,
             items,
             paymentMethod: "Not specified",
             orderNumber: index + 1,
@@ -121,21 +162,36 @@ export default function VendorDashboard() {
             return key !== 'userId' && key !== 'phoneNumber' && isOrderDetails(value)
           }) as [string, OrderDetails][]
 
-          const items = dishEntries.map(([dishName, details], itemIndex) => ({
-            id: itemIndex + 1,
-            name: dishName,
-            quantity: details.quantity,
-            waitTime: details.waitTime,
-            completed: details.completed,
-            specialInstructions: "",
-          }))
+          // Get the first dish's time_started as the order time
+          const firstDish = dishEntries[0]?.[1] as OrderDetails
+          const rawTimeStarted = firstDish?.time_started || null
+
+          const items = dishEntries.map(([dishName, details], itemIndex) => {
+            const orderDetails = details as OrderDetails
+            return {
+              id: itemIndex + 1,
+              name: dishName,
+              quantity: orderDetails.quantity || 0,
+              waitTime: orderDetails.waitTime || 0,
+              price: typeof orderDetails.price === 'number' ? orderDetails.price : 0,
+              completed: orderDetails.completed || false,
+              timeStarted: orderDetails.time_started,
+              timeCompleted: orderDetails.time_completed,
+              specialInstructions: "",
+            }
+          })
 
           return {
-            id: orderId.replace(/ /g, '_'),
+            id: orderId,
             customerName: `Customer ${order.phoneNumber}`,
-            date: new Date().toISOString(),
+            date: rawTimeStarted || new Date().toISOString(),
+            timeStarted: rawTimeStarted,
             status: "completed" as const,
-            total: items.reduce((sum, item) => sum + (item.waitTime * item.quantity), 0),
+            total: items.reduce((sum, item) => {
+              const price = typeof item.price === 'number' ? item.price : 0
+              const quantity = typeof item.quantity === 'number' ? item.quantity : 0
+              return sum + (price * quantity)
+            }, 0),
             items,
             paymentMethod: "Not specified",
             orderNumber: processedPendingOrders.length + index + 1,
@@ -275,9 +331,9 @@ export default function VendorDashboard() {
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="ml-2">
                   <Avatar className="h-8 w-8 mr-2">
-                    <AvatarFallback>TH</AvatarFallback>
+                    <AvatarFallback>{HAWKER_STALL.split(' ').map(word => word[0]).join('')}</AvatarFallback>
                   </Avatar>
-                  Tian Hainanese Chicken
+                  {HAWKER_STALL}
                   <ChevronDown className="ml-2 h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -361,10 +417,10 @@ export default function VendorDashboard() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
-              <Button variant="outline">
+              {/* <Button variant="outline">
                 <Filter className="h-4 w-4 mr-2" />
                 Filter
-              </Button>
+              </Button> */}
             </div>
           </div>
 
@@ -396,6 +452,9 @@ export default function VendorDashboard() {
                                 Pending
                               </Badge>
                             </CardTitle>
+                            <CardDescription>
+                              {order.items[0]?.timeStarted || 'Time not available'}
+                            </CardDescription>
                           </div>
                           <div className="flex items-center">
                             <div className="text-right mr-4">
@@ -441,7 +500,7 @@ export default function VendorDashboard() {
                                     {item.quantity}x {item.name}
                                   </label>
                                   <span className={item.completed ? "text-muted-foreground" : ""}>
-                                    ${(item.waitTime * item.quantity).toFixed(2)}
+                                    ${(item.price * item.quantity).toFixed(2)}
                                   </span>
                                 </div>
                                 {item.specialInstructions && (
@@ -482,13 +541,13 @@ export default function VendorDashboard() {
                         <div className="flex justify-between items-start">
                           <div>
                             <CardTitle className="text-lg flex items-center">
-                              Order #{order.orderNumber}
-                              <Badge className="ml-2" variant="outline">
+                              #{order.id}
+                              <Badge className="ml-2" variant="default">
                                 Completed
                               </Badge>
                             </CardTitle>
                             <CardDescription>
-                              {order.id} • {formatTime(order.date)} • {order.customerName}
+                              {order.items[0]?.timeStarted || 'Time not available'}
                             </CardDescription>
                           </div>
                           <div className="flex items-center">
@@ -525,7 +584,7 @@ export default function VendorDashboard() {
                                     {item.quantity}x {item.name}
                                   </span>
                                   <span className="text-muted-foreground">
-                                    ${(item.waitTime * item.quantity).toFixed(2)}
+                                    ${(item.price * item.quantity).toFixed(2)}
                                   </span>
                                 </div>
                                 {item.specialInstructions && (

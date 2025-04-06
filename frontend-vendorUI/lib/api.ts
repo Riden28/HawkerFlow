@@ -8,6 +8,7 @@ export interface OrderItem {
   waitTime: number
   time_started: string
   time_completed: string | null
+  price: number  // Add the price field
 }
 
 export interface Order {
