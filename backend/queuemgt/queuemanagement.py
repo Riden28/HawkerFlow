@@ -95,7 +95,7 @@ def process_order(ch, method, properties, body):
                 "estimatedWaitTime": firestore.Increment(total_wait_time)
             })
 
-        print("Order {orderDetails['orderId']}")
+        print(f"Added Order {orderDetails['orderId']}")
     except Exception as e:
         print(f"Error processing order: {e}")
 
@@ -449,13 +449,17 @@ if __name__ == '__main__':
 
 # orderDetails ={
 #     "token": {
+#         "card": {},
+#         "client_ip": "58.182.136.164",
 #         "created": 1743752552,
+#         "id": "tok_1RAUM2FKfP7LOez7hS0UrTQH",
 #         "livemode": False,
 #         "object": "token",
 #         "type": "card",
 #         "used": False
 #     },
 #     "amount": 14,
+#     "hawkerCenter": "test",
 #     "orderId": "order_003",
 #     "phoneNumber": "+6512345678",
 #     "userId": "user_002",
@@ -465,6 +469,8 @@ if __name__ == '__main__':
 #             {
 #             "name": "Fried Carrot Cake",
 #             "quantity": 1,
+#             "waitTime": 6,
+#             "price": 3.50
 #             }
 #         ]
 #         },
