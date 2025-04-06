@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, CreditCard, QrCode, Banknote } from "lucide-react"
+import { ArrowLeft, CreditCard } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -12,7 +12,10 @@ import { Label } from "@/components/ui/label"
 import { useCart } from "@/contexts/cart-context"
 import { Navbar } from "@/components/navbar"
 import { toast } from "sonner"
-import StripeTokenForm from "@/components/stripe-form"
+import dynamic from "next/dynamic"
+
+// Dynamically import StripeTokenForm (client-side only)
+const StripeTokenForm = dynamic(() => import("@/components/stripe-form"), { ssr: false })
 
 export default function PaymentPage() {
   const router = useRouter()
@@ -24,8 +27,8 @@ export default function PaymentPage() {
   const [paymentMethod, setPaymentMethod] = useState<"card">("card")
   const [cardToken, setCardToken] = useState<any>(null)
   const [isCardValid, setIsCardValid] = useState(false)
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false)
 
+  // Define handleBack so that it's in scope when the button is clicked.
   const handleBack = () => {
     router.back()
   }
@@ -36,17 +39,38 @@ export default function PaymentPage() {
     setIsCardValid(true)
   }
 
+  const calculateSubtotal = () => {
+    return cart.items.reduce((total, item) => {
+      const itemTotal = item.price * item.quantity
+      const optionsTotal = item.options?.reduce((sum, opt) => sum + opt.price, 0) || 0
+      return total + (itemTotal + optionsTotal * item.quantity)
+    }, 0)
+  }
+
+  const calculateDiscount = () => {
+    return calculateSubtotal() * 0.1
+  }
+
+  const calculateServiceFee = () => {
+    return 0.50
+  }
+
+  const calculateTotal = () => {
+    const subtotal = calculateSubtotal()
+    const discount = calculateDiscount()
+    const serviceFee = calculateServiceFee()
+    return subtotal - discount + serviceFee
+  }
+
   const handlePayment = async () => {
     if (!phoneNumber) {
       setError("Please enter your phone number for order updates")
       return
     }
-
     if (paymentMethod === "card" && !cardToken) {
       setError("Please complete card payment first")
       return
     }
-
     if (!cart?.items || cart.items.length === 0) {
       setError("Your cart is empty")
       return
@@ -71,11 +95,9 @@ export default function PaymentPage() {
         specialInstructions: item.specialInstructions
       }))
 
-      // Create the complete request data structure
       const requestData = {
         createdAt: new Date().toISOString(),
         phoneNumber,
-        stripeToken: cardToken.id,
         token: {
           card: {
             address_city: cardToken.card.address_city,
@@ -111,6 +133,15 @@ export default function PaymentPage() {
           used: cardToken.used
         },
         items: orderItems,
+        userId: "user123",
+        stalls: {
+          [orderItems[0].stallName]: {
+            dishes: orderItems
+          }
+        },
+        amount: calculateTotal(),
+        hawkerCenter: "maxwell-food-centre",
+        orderId: "order_" + Date.now(),
         paymentMethod,
         specialInstructions,
         status: "ready_for_pickup",
@@ -141,11 +172,7 @@ export default function PaymentPage() {
         throw new Error(data.message || "Failed to process order")
       }
 
-      // Payment successful
-      console.log("Payment successful, creating local order...")
       toast.success("Payment successful! Redirecting to orders...")
-      
-      // Create order in localStorage
       const order = {
         id: data.orderId,
         items: orderItems,
@@ -159,36 +186,8 @@ export default function PaymentPage() {
 
       const existingOrders = JSON.parse(localStorage.getItem("orders") || "[]")
       localStorage.setItem("orders", JSON.stringify([...existingOrders, order]))
-      console.log("=== FINAL DATA SENT TO ORDERMGMT ===")
-      console.log({
-        createdAt: new Date().toISOString(),
-        phoneNumber,
-        id: data.orderId,
-        token: {
-          card: cardToken.card,
-          client_ip: cardToken.client_ip,
-          created: cardToken.created,
-          id: cardToken.id,
-          livemode: cardToken.livemode,
-          object: cardToken.object,
-          type: cardToken.type,
-          used: cardToken.used
-        },
-        items: orderItems,
-        paymentMethod,
-        specialInstructions,
-        status: "ready_for_pickup",
-        total: calculateTotal()
-      })
-      console.log("=== END OF ORDERMGMT DATA ===")
-
-      // Clear the card token and form state
-      setCardToken(null)
-      setIsCardValid(false)
-      
       clearCart()
       router.push("/orders")
-
     } catch (err) {
       console.error("Payment error:", err)
       setError(err instanceof Error ? err.message : "Payment failed. Please try again.")
@@ -201,33 +200,9 @@ export default function PaymentPage() {
     }
   }
 
-  const calculateSubtotal = () => {
-    return cart.items.reduce((total, item) => {
-      const itemTotal = item.price * item.quantity
-      const optionsTotal = item.options?.reduce((sum, opt) => sum + opt.price, 0) || 0
-      return total + (itemTotal + optionsTotal * item.quantity)
-    }, 0)
-  }
-
-  const calculateDiscount = () => {
-    return calculateSubtotal() * 0.1 // 10% discount
-  }
-
-  const calculateServiceFee = () => {
-    return 0.50 // Fixed service fee
-  }
-
-  const calculateTotal = () => {
-    const subtotal = calculateSubtotal()
-    const discount = calculateDiscount()
-    const serviceFee = calculateServiceFee()
-    return subtotal - discount + serviceFee
-  }
-
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-
       <main className="container mx-auto px-4 py-8">
         <div className="flex items-center mb-6">
           <Button variant="ghost" size="sm" onClick={handleBack} className="mr-2">
@@ -236,7 +211,6 @@ export default function PaymentPage() {
           </Button>
           <h2 className="text-3xl font-bold">Payment</h2>
         </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div>
             <Card className="mb-8">
@@ -258,7 +232,6 @@ export default function PaymentPage() {
                       required
                     />
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium mb-4">
                       Payment Method
@@ -280,11 +253,11 @@ export default function PaymentPage() {
                       </div>
                     </RadioGroup>
                   </div>
-
                   {paymentMethod === "card" && (
-                    <StripeTokenForm onTokenGenerated={handleCardTokenGenerated} />
+                    <div className="mt-6">
+                      <StripeTokenForm onTokenGenerated={handleCardTokenGenerated} />
+                    </div>
                   )}
-
                   <div>
                     <label htmlFor="special-instructions" className="block text-sm font-medium mb-2">
                       Special Instructions
@@ -297,16 +270,12 @@ export default function PaymentPage() {
                       className="resize-none"
                     />
                   </div>
-
-                  {error && (
-                    <div className="text-red-500 text-sm">{error}</div>
-                  )}
-
+                  {error && <div className="text-red-500 text-sm">{error}</div>}
                   <Button 
                     className="w-full" 
                     onClick={handlePayment}
                     disabled={
-                      isProcessing || 
+                      isProcessing ||
                       (paymentMethod === "card" && (!cardToken || !isCardValid)) ||
                       !phoneNumber
                     }
@@ -317,7 +286,6 @@ export default function PaymentPage() {
               </CardContent>
             </Card>
           </div>
-
           <div>
             <Card>
               <CardHeader>
@@ -345,7 +313,6 @@ export default function PaymentPage() {
                       </p>
                     </div>
                   ))}
-
                   <div className="border-t pt-4 mt-4">
                     <div className="flex justify-between mb-2">
                       <span>Subtotal</span>
@@ -370,7 +337,6 @@ export default function PaymentPage() {
           </div>
         </div>
       </main>
-
       <footer className="bg-muted py-6 mt-12">
         <div className="container mx-auto px-4 text-center text-muted-foreground">
           <p>© {new Date().getFullYear()} HawkerFlow. All rights reserved.</p>
