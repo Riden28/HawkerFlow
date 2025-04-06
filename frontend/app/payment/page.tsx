@@ -137,6 +137,36 @@ export default function PaymentPage() {
       })
 
       console.log("Received response:", response.status, response.statusText)
+
+      // const data = await response.json()
+      // console.log("Response data:", data)
+
+      // if (!response.ok) {
+      //   throw new Error(data.message || "Failed to process order")
+      // }
+
+      // if (data.paymentStatus === "success") {
+      //   toast.success("Payment successful! Redirecting to orders...")
+      //   const order = {
+      //     id: data.orderId,
+      //     items: orderItems,
+      //     total: calculateTotal(),
+      //     phoneNumber,
+      //     specialInstructions,
+      //     paymentMethod,
+      //     status: "ready_for_pickup",
+      //     createdAt: new Date().toISOString()
+      //   }
+      //   const existingOrders = JSON.parse(localStorage.getItem("orders") || "[]")
+      //   localStorage.setItem("orders", JSON.stringify([...existingOrders, order]))
+      //   clearCart()
+      //   router.push("/orders")
+      // } else {
+      //   toast.error("Payment failed", {
+      //     description: "Please try again or use another card."
+      //   })
+      // }
+
       const data = await response.json()
       console.log("Response data:", data)
 
@@ -144,7 +174,7 @@ export default function PaymentPage() {
         throw new Error(data.message || "Failed to process order")
       }
 
-      if (data.paymentStatus === "success") {
+      if (data.success) {
         toast.success("Payment successful! Redirecting to orders...")
         const order = {
           id: data.orderId,
@@ -165,6 +195,7 @@ export default function PaymentPage() {
           description: "Please try again or use another card."
         })
       }
+
     } catch (err: any) {
       console.error("Payment error:", err)
       setError(err.message || "Payment failed. Please try again.")
