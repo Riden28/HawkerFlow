@@ -41,7 +41,7 @@ hawker_centres = [
 ]
 
 stalls = {
-    "Chicken Rice Stall": ["Chicken Rice", "Roasted Chicken", "Egg"],
+    "Chicken Rice Stall": ["Chicken", "Roasted Chicken", "Egg"],
     "Noodle Stall": ["Fishball Noodles", "Laksa", "Wanton Mee"]
 }
 
@@ -76,6 +76,7 @@ for centre in hawker_centres:
             for dish in selected_dishes:
                 quantity = random.randint(1, 3)
                 wait_time = random.randint(5, 10)
+                price = random.randint(1, 5)
                 total_dish_wait = wait_time * quantity
 
                 stall_total_wait += total_dish_wait
@@ -86,6 +87,7 @@ for centre in hawker_centres:
                     "waitTime": wait_time,
                     "time_started": firestore.SERVER_TIMESTAMP,
                     "time_completed": None,
+                    "price": price
                 }
 
             order_ref.set(order_data)
@@ -93,6 +95,7 @@ for centre in hawker_centres:
 
         # Update accurate total wait time
         stall_ref.update({"estimatedWaitTime": stall_total_wait})
+        stall_ref.update({"totalEarned": 0})
         print(f"  ⏳ Estimated wait time set: {stall_total_wait} mins")
 
 print("\n🎉 All hawker centres seeded successfully with clean order IDs and 'orders' subcollections!")

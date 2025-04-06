@@ -30,6 +30,12 @@ QUEUE_NAME = 'O_queue'
 # print(RABBITMQ_HOST)
 connection = pika.BlockingConnection(pika.ConnectionParameters(RABBITMQ_HOST))
 channel = connection.channel()
+###############################################################################
+#Consume from rabbitmq
+###############################################################################
+
+
+
 
 ###############################################################################
 #Consume from rabbitmq
@@ -67,6 +73,7 @@ def process_order(ch, method, properties, body):
                 dish_name = dish_info["name"]
                 wait_time = dish_info["waitTime"]
                 quantity = dish_info["quantity"]
+                price = dish_info["price"]
                 
                 dish_data[dish_name] = {
                     "completed": False,
@@ -74,6 +81,7 @@ def process_order(ch, method, properties, body):
                     "time_started": firestore.SERVER_TIMESTAMP,
                     "time_completed": None,
                     "waitTime": wait_time,
+                    "price": price,
                 }
 
                 total_wait_time += wait_time * quantity
@@ -151,6 +159,33 @@ def get_estimated_wait_time(hawkerCenter, hawkerStall):
         print(f"Error fetching wait time: {e}")
         abort(500, description="Internal server error.")
 
+@app.route('/<hawkerCenter>/<hawkerStall>/totalEarned', methods=['GET'])
+def get_total_earned(hawkerCenter, hawkerStall):
+    try:
+        # Reference to the hawker stall document
+        doc_ref = db.collection(hawkerCenter).document(hawkerStall)
+        doc = doc_ref.get()
+
+        if not doc.exists:
+            abort(404, description="Hawker stall not found.")
+
+        data = doc.to_dict()
+        total_earned = data.get('totalEarned')
+
+        if total_earned is None:
+            abort(404, description="Total earned not set for this stall.")
+
+        return jsonify({
+            "hawkerCenter": hawkerCenter,
+            "hawkerStall": hawkerStall,
+            "totalEarned": total_earned
+        })
+
+    except Exception as e:
+        print(f"Error fetching wait time: {e}")
+        abort(500, description="Internal server error.")
+
+
 ######GET - Scenario 2: Hawker UI pulls complete order list######
 def is_order_completed(order_data):
     ignore = {"userId", "phoneNumber"}
@@ -166,8 +201,6 @@ def is_order_completed(order_data):
             return False
     return True
 
-def get_estimated_wait_time(hawkerCenter, hawkerStall):
-        abort(500, description="Internal server error.")
 
 ######GET - Scenario 2: Hawker UI pulls complete order list######
 @app.route('/<hawkerCenter>/<hawkerStall>/orders', methods=['GET'])
@@ -281,6 +314,10 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
         if not dish_data:
             return {"error": "Dish not found in order"}, 404
 
+        dish_price= dish_data.get("price")
+        if dish_price is None:
+            return {"error": "Dish price not set"}, 400
+        
         dish_time = dish_data.get("waitTime")
         if dish_time is None:
             return {"error": "Dish wait time not set"}, 400
@@ -296,6 +333,7 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
         }
         order_ref.update(updates)
 
+        ##########################################################
         # Subtract dish wait time from stall's estimated wait time
         stall_ref = db.collection(hawkerCenter).document(hawkerStall)
         stall_doc = stall_ref.get()
@@ -312,9 +350,20 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
         new_wait_time = max(current_wait_time - dish_time * quantity, 0)  # Avoid negative time
         stall_ref.update({"estimatedWaitTime": new_wait_time})
 
+        ##########################################################
+        # Add dish price to stall's total earned
+        current_total_earned = stall_data.get("totalEarned")
+
+        if current_total_earned is None:
+            stall_ref.update({"totalEarned": 0})
+        else:
+            new_total_earned = max(current_total_earned + dish_price * quantity, 0)
+            stall_ref.update({"totalEarned": new_total_earned})
+
         time.sleep(1)
         updated_order_data = order_ref.get().to_dict()
 
+        ##########################################################
         #publish order
         if is_order_completed(updated_order_data):
             
@@ -382,10 +431,6 @@ def delete_orders_and_reset_wait_time():
     root_collections = db.collections()
     for root_collection in root_collections:
         process_collection(root_collection)
-
-# Call the function to execute it
-delete_orders_and_reset_wait_time()
-
 
 scheduler = BackgroundScheduler()
 # Schedule the function to run daily at 3 AM

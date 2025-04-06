@@ -40,6 +40,41 @@ paths:
         '500':
           description: Internal server error
 
+  /{hawkerCenter}/{hawkerStall}/totalEarned:
+    get:
+      summary: 'Get total earnings of a hawker stall'
+      description: 'Retrieves the total earnings for a specified stall within a hawker center.'
+      produces:
+        - 'application/json'
+      parameters:
+        - name: 'hawkerCenter'
+          in: 'path'
+          required: true
+          type: 'string'
+          description: 'The name of the hawker center'
+        - name: 'hawkerStall'
+          in: 'path'
+          required: true
+          type: 'string'
+          description: 'The specific stall within the hawker center'
+      responses:
+        200:
+          description: 'Successful retrieval of total earnings'
+          schema:
+            type: 'object'
+            properties:
+              hawkerCenter:
+                type: 'string'
+              hawkerStall:
+                type: 'string'
+              totalEarned:
+                type: 'number'
+                format: 'double'
+        404:
+          description: 'Hawker stall not found or total earned not set for this stall'
+        500:
+          description: 'Internal server error'
+
   /{hawkerCenter}/{hawkerStall}/orders:
     get:
       summary: Get All Orders for a Stall
