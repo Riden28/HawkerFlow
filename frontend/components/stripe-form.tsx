@@ -1,26 +1,25 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect } from "react"
-import { loadStripe } from "@stripe/stripe-js"
+import { useState, useEffect, FormEvent } from "react"
+import { loadStripe, Stripe } from "@stripe/stripe-js"
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
 
-// Initialize Stripe with your publishable key
-const getStripe = () => {
+// 1) Load the publishable key from environment variables
+const getStripe = (): Promise<Stripe | null> => {
   const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   if (!key) {
-    console.error("STripe publishable key is missing!")
-    return null
+    console.error("Stripe publishable key is missing!")
+    return Promise.resolve(null)
   }
   return loadStripe(key)
 }
 
 const stripePromise = getStripe()
 
-// The form component that collects card details
+// 2) The main form that collects card details & generates the token
 function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: any) => void }) {
   const stripe = useStripe()
   const elements = useElements()
@@ -29,53 +28,43 @@ function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: any) => 
   const [isCardValid, setIsCardValid] = useState(false)
 
   useEffect(() => {
-    if (!stripe || !elements) {
-      return
-    }
-
+    if (!stripe || !elements) return
     const cardElement = elements.getElement(CardElement)
-    if (!cardElement) {
-      return
-    }
+    if (!cardElement) return
 
-    // Add change event listener to the card element
-    cardElement.on('change', (event) => {
+    // Listen for card detail changes (e.g. validation errors)
+    cardElement.on("change", (event) => {
       setIsCardValid(event.complete)
       setError(event.error ? event.error.message : null)
     })
   }, [stripe, elements])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Only creates a token; does not finalize payment
+  const handleGetToken = async (e: FormEvent) => {
     e.preventDefault()
-    if (!stripe || !elements) {
-      return
-    }
+    if (!stripe || !elements) return
 
     setLoading(true)
     setError(null)
-
     try {
       const cardElement = elements.getElement(CardElement)
       if (!cardElement) {
-        throw new Error("Card element not found")
+        throw new Error("CardElement not found")
       }
-
       const { token, error } = await stripe.createToken(cardElement)
-      
       if (error) {
         throw error
       }
-
       if (!token) {
         throw new Error("Failed to create token")
       }
-
       onTokenGenerated(token)
-    } catch (err) {
+      toast.success("Token generated successfully. Now click the bottom 'Pay Now' to finalize payment.")
+    } catch (err: any) {
       console.error("Error creating token:", err)
-      setError(err instanceof Error ? err.message : "Failed to process payment")
-      toast.error("Payment failed", {
-        description: err instanceof Error ? err.message : "Failed to process payment"
+      setError(err.message || "Failed to process payment")
+      toast.error("Failed to generate token", {
+        description: err.message || "Please check your card details."
       })
     } finally {
       setLoading(false)
@@ -83,11 +72,11 @@ function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: any) => 
   }
 
   return (
-    <form onSubmit={handleSubmit} className="w-full max-w-md mx-auto">
+    <form onSubmit={handleGetToken} className="w-full max-w-md mx-auto">
       <Card>
         <CardHeader>
           <CardTitle>Card Details</CardTitle>
-          <CardDescription>Enter your card information to complete the payment</CardDescription>
+          <CardDescription>Enter your card information to generate a token</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -96,31 +85,30 @@ function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: any) => 
                 options={{
                   style: {
                     base: {
-                      fontSize: '16px',
-                      color: '#424770',
-                      '::placeholder': {
-                        color: '#aab7c4',
+                      fontSize: "16px",
+                      color: "#424770",
+                      "::placeholder": {
+                        color: "#aab7c4",
                       },
                     },
                     invalid: {
-                      color: '#9e2146',
+                      color: "#9e2146",
                     },
                   },
                 }}
               />
             </div>
-            {error && (
-              <div className="text-red-500 text-sm">{error}</div>
-            )}
+            {error && <div className="text-red-500 text-sm">{error}</div>}
           </div>
         </CardContent>
         <CardFooter>
-          <Button 
-            type="submit" 
-            className="w-full" 
+          {/* 3) Renamed button to "Get Token" to avoid confusion with final payment */}
+          <Button
+            type="submit"
+            className="w-full"
             disabled={!stripe || !elements || loading || !isCardValid}
           >
-            {loading ? "Processing..." : "Pay Now"}
+            {loading ? "Generating..." : "Get Token"}
           </Button>
         </CardFooter>
       </Card>
@@ -128,15 +116,14 @@ function CheckoutForm({ onTokenGenerated }: { onTokenGenerated: (token: any) => 
   )
 }
 
-// The main component that provides the Stripe context
+// 4) Wrap the CheckoutForm with <Elements> to provide Stripe context
 export default function StripeTokenForm({ onTokenGenerated }: { onTokenGenerated: (token: any) => void }) {
   if (!stripePromise) {
     return null
   }
-
   return (
     <Elements stripe={stripePromise}>
       <CheckoutForm onTokenGenerated={onTokenGenerated} />
     </Elements>
   )
-} 
+}
