@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { Navbar } from "@/components/navbar"
 import {
     Card,
@@ -13,6 +13,9 @@ import {
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
+// Import your cart context hook and toast hook
+import { useCart } from "@/contexts/cart-context"
+import { useToast } from "@/hooks/use-toast"
 
 interface MenuItem {
     dishId: string
@@ -29,6 +32,9 @@ export default function DishesPage() {
     const [menuItems, setMenuItems] = useState<MenuItem[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const { addItem } = useCart()
+    const { toast } = useToast()
+    const router = useRouter()
 
     useEffect(() => {
         async function fetchDishes() {
@@ -56,7 +62,7 @@ export default function DishesPage() {
         <div className="min-h-screen bg-background">
             <Navbar />
             <main className="container mx-auto px-4 py-8">
-                <Button variant="ghost" onClick={() => window.history.back()}>
+                <Button variant="ghost" onClick={() => router.back()}>
                     <ArrowLeft className="h-4 w-4" />
                     Back
                 </Button>
@@ -66,14 +72,16 @@ export default function DishesPage() {
                         <Card key={item.dishId}>
                             <div className="relative h-40">
                                 <img
-                                    src={item.dishPhoto || "/placeholder.svg"}
+                                    src={item.dishPhoto}  // Use the actual dish photo URL
                                     alt={item.dishName}
                                     className="w-full h-full object-cover"
                                 />
                             </div>
                             <CardHeader>
                                 <CardTitle>{item.dishName}</CardTitle>
-                                <CardDescription>{item.description || "No description provided."}</CardDescription>
+                                <CardDescription>
+                                    {item.description || "No description provided."}
+                                </CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <div className="flex justify-between text-sm text-muted-foreground mb-2">
@@ -82,7 +90,32 @@ export default function DishesPage() {
                                 <p className="text-xl font-bold">${item.price.toFixed(2)}</p>
                             </CardContent>
                             <CardFooter>
-                                <Button className="w-full" disabled={!item.inStock}>
+                                <Button
+                                    className="w-full"
+                                    disabled={!item.inStock}
+                                    onClick={() => {
+                                        // Call the cart context's addItem with dish details
+                                        addItem({
+                                            id: item.dishId,
+                                            name: item.dishName,
+                                            price: item.price,
+                                            quantity: 1,
+                                            image: item.dishPhoto,
+                                            stallId: stallId,
+                                            stallName: stallId, // You might want to decode this if needed
+                                            hawkerCenterId: hawkerId,
+                                            hawkerCenterName: "Maxwell Food Centre", // Or fetch dynamically if available
+                                            waitTime: item.waitTime.toString(),
+                                            prepTime: "", // Set this if available
+                                            options: [],
+                                            specialInstructions: "",
+                                        })
+                                        toast({
+                                            title: "Added to cart",
+                                            description: `1x ${item.dishName} added to your cart.`,
+                                        })
+                                    }}
+                                >
                                     Add to Cart
                                 </Button>
                             </CardFooter>
