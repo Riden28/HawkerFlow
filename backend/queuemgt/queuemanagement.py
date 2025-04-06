@@ -310,7 +310,7 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
         order_data = order_doc.to_dict()
 
         # Get the wait time for this dish
-        userId = order_data.get(userId)
+        userId = order_data.get("userId")
         dish_data = order_data.get(dishName)
         if not dish_data:
             return {"error": "Dish not found in order"}, 404
