@@ -11,8 +11,8 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# stripe.api_key = os.environ.get("STRIPE_API_KEY")
-stripe.api_key = "pk_test_51R80VkFKfP7LOez7sDTq82hBlhj8mZFJRFcFmb2Y35saQ1FVMVUIOdfX8EzGEsDRYReFZ3CKzP7lFeONCQL2XldX00o7spgvVN"
+stripe.api_key = os.environ.get("STRIPE_API_KEY")
+# stripe.api_key = "pk_test_51R80VkFKfP7LOez7sDTq82hBlhj8mZFJRFcFmb2Y35saQ1FVMVUIOdfX8EzGEsDRYReFZ3CKzP7lFeONCQL2XldX00o7spgvVN"
 
 @app.route('/payment', methods=['POST'])
 def payment():

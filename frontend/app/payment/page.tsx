@@ -14,7 +14,7 @@ import { Navbar } from "@/components/navbar"
 import { toast } from "sonner"
 import dynamic from "next/dynamic"
 
-// Dynamically import StripeTokenForm (client-side only)
+// Dynamically import StripeTokenForm so that it's only loaded on the client
 const StripeTokenForm = dynamic(() => import("@/components/stripe-form"), { ssr: false })
 
 export default function PaymentPage() {
@@ -28,17 +28,19 @@ export default function PaymentPage() {
   const [cardToken, setCardToken] = useState<any>(null)
   const [isCardValid, setIsCardValid] = useState(false)
 
-  // Define handleBack so that it's in scope when the button is clicked.
+  // Define handleBack so it’s available
   const handleBack = () => {
     router.back()
   }
 
+  // Handler for token generation from StripeTokenForm ("Get Token")
   const handleCardTokenGenerated = (token: any) => {
     console.log("Token generated:", token)
     setCardToken(token)
     setIsCardValid(true)
   }
 
+  // Calculation functions
   const calculateSubtotal = () => {
     return cart.items.reduce((total, item) => {
       const itemTotal = item.price * item.quantity
@@ -48,11 +50,11 @@ export default function PaymentPage() {
   }
 
   const calculateDiscount = () => {
-    return calculateSubtotal() * 0.1
+    return calculateSubtotal() * 0.1 // 10% discount
   }
 
   const calculateServiceFee = () => {
-    return 0.50
+    return 0.5 // Fixed fee
   }
 
   const calculateTotal = () => {
@@ -62,13 +64,14 @@ export default function PaymentPage() {
     return subtotal - discount + serviceFee
   }
 
+  // Final payment submission handler ("Pay Now")
   const handlePayment = async () => {
     if (!phoneNumber) {
       setError("Please enter your phone number for order updates")
       return
     }
     if (paymentMethod === "card" && !cardToken) {
-      setError("Please complete card payment first")
+      setError("Please generate your card token first by clicking 'Get Token'")
       return
     }
     if (!cart?.items || cart.items.length === 0) {
@@ -95,45 +98,25 @@ export default function PaymentPage() {
         specialInstructions: item.specialInstructions
       }))
 
+      // Build the requestData object using only the token fields required by payment.py.
       const requestData = {
         createdAt: new Date().toISOString(),
         phoneNumber,
+        // Send a trimmed token object containing only the necessary fields:
         token: {
-          card: {
-            address_city: cardToken.card.address_city,
-            address_country: cardToken.card.address_country,
-            address_line1: cardToken.card.address_line1,
-            address_line1_check: cardToken.card.address_line1_check,
-            address_line2: cardToken.card.address_line2,
-            address_state: cardToken.card.address_state,
-            address_zip: cardToken.card.address_zip,
-            address_zip_check: cardToken.card.address_zip_check,
-            brand: cardToken.card.brand,
-            country: cardToken.card.country,
-            cvc_check: cardToken.card.cvc_check,
-            dynamic_last4: cardToken.card.dynamic_last4,
-            exp_month: cardToken.card.exp_month,
-            exp_year: cardToken.card.exp_year,
-            funding: cardToken.card.funding,
-            id: cardToken.card.id,
-            last4: cardToken.card.last4,
-            name: cardToken.card.name,
-            networks: cardToken.card.networks,
-            object: cardToken.card.object,
-            regulated_status: cardToken.card.regulated_status,
-            tokenization_method: cardToken.card.tokenization_method,
-            wallet: cardToken.card.wallet
-          },
-          client_ip: cardToken.client_ip,
-          created: cardToken.created,
           id: cardToken.id,
-          livemode: cardToken.livemode,
-          object: cardToken.object,
           type: cardToken.type,
-          used: cardToken.used
+          card: {
+            id: cardToken.card.id,
+            brand: cardToken.card.brand,
+            last4: cardToken.card.last4,
+            exp_month: cardToken.card.exp_month,
+            exp_year: cardToken.card.exp_year
+          }
         },
         items: orderItems,
         userId: "user123",
+        // For demonstration, grouping all items under one stall name:
         stalls: {
           [orderItems[0].stallName]: {
             dishes: orderItems
@@ -172,28 +155,33 @@ export default function PaymentPage() {
         throw new Error(data.message || "Failed to process order")
       }
 
-      toast.success("Payment successful! Redirecting to orders...")
-      const order = {
-        id: data.orderId,
-        items: orderItems,
-        total: calculateTotal(),
-        phoneNumber,
-        specialInstructions,
-        paymentMethod,
-        status: "ready_for_pickup",
-        createdAt: new Date().toISOString()
+      if (data.paymentStatus === "success") {
+        toast.success("Payment successful! Redirecting to orders...")
+        const order = {
+          id: data.orderId,
+          items: orderItems,
+          total: calculateTotal(),
+          phoneNumber,
+          specialInstructions,
+          paymentMethod,
+          status: "ready_for_pickup",
+          createdAt: new Date().toISOString()
+        }
+        const existingOrders = JSON.parse(localStorage.getItem("orders") || "[]")
+        localStorage.setItem("orders", JSON.stringify([...existingOrders, order]))
+        clearCart()
+        router.push("/orders")
+      } else {
+        toast.error("Payment failed", {
+          description: "Please try again or use another card."
+        })
       }
-
-      const existingOrders = JSON.parse(localStorage.getItem("orders") || "[]")
-      localStorage.setItem("orders", JSON.stringify([...existingOrders, order]))
-      clearCart()
-      router.push("/orders")
-    } catch (err) {
+    } catch (err: any) {
       console.error("Payment error:", err)
-      setError(err instanceof Error ? err.message : "Payment failed. Please try again.")
-      toast.error(err instanceof Error ? err.message : "Payment failed. Please try again.", {
+      setError(err.message || "Payment failed. Please try again.")
+      toast.error(err.message || "Payment failed. Please try again.", {
         description: "Please check your card details or try another payment method.",
-        duration: 5000,
+        duration: 5000
       })
     } finally {
       setIsProcessing(false)
@@ -253,6 +241,7 @@ export default function PaymentPage() {
                       </div>
                     </RadioGroup>
                   </div>
+                  {/* StripeTokenForm renders a card input field with a "Get Token" button */}
                   {paymentMethod === "card" && (
                     <div className="mt-6">
                       <StripeTokenForm onTokenGenerated={handleCardTokenGenerated} />
@@ -271,12 +260,13 @@ export default function PaymentPage() {
                     />
                   </div>
                   {error && <div className="text-red-500 text-sm">{error}</div>}
-                  <Button 
-                    className="w-full" 
+                  {/* Final "Pay Now" button for sending payment request */}
+                  <Button
+                    className="w-full"
                     onClick={handlePayment}
                     disabled={
                       isProcessing ||
-                      (paymentMethod === "card" && (!cardToken || !isCardValid)) ||
+                      (paymentMethod === "card" && !cardToken) ||
                       !phoneNumber
                     }
                   >
