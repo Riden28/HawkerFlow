@@ -5,14 +5,10 @@ import requests
 import pika
 from flask import Flask, request, jsonify
 
-###############################################################################
 # Flask App Initialization
-###############################################################################
 app = Flask(__name__)
 
-###############################################################################
 # Environment-Based Configuration
-###############################################################################
 # Base URLs for outbound REST calls to other microservices.
 # MENU_SERVICE_URL = os.environ.get("MENU_SERVICE_URL", "http:/localhost/menu:5001")
 # PAYMENT_SERVICE_URL = os.environ.get("PAYMENT_SERVICE_URL", "http:/localhost/payment:5002")
@@ -34,14 +30,10 @@ except Exception as e:
     print(f"Error setting up RabbitMQ: {e}")
     channel = None
 
-###############################################################################
 # In-memory storage for orders (for demonstration purposes)
-###############################################################################
 orders = {}
 
-###############################################################################
 # Utility function: Asynchronous Publisher via RabbitMQ
-###############################################################################
 def publish_message(routing_key: str, message: dict):
     """
     Publishes a JSON message to the RabbitMQ exchange using the provided routing key.
@@ -61,13 +53,10 @@ def publish_message(routing_key: str, message: dict):
     except Exception as e:
         print(f"Failed to publish message: {e}")
 
-###############################################################################
 # 1) Composite Endpoints to Retrieve Stall Lists and Menu Items (Proxy Calls)
 ###############################################################################
 
-##############################################
 # Proxy GET /hawkerCenters
-##############################################
 @app.route("/hawkerCenters", methods=["GET"])
 def proxy_get_all_hawker_centers():
     url = f"{MENU_SERVICE_URL}/hawkerCenters"
@@ -77,9 +66,7 @@ def proxy_get_all_hawker_centers():
     else:
         return jsonify({"error": f"Failed to retrieve hawker centers. Status code: {r.status_code}"}), r.status_code
 
-##############################################
 # Proxy GET /hawkerCenters/<hawkerId>/stalls
-##############################################
 @app.route("/hawkerCenters/<string:hawkerId>/stalls", methods=["GET"])
 def proxy_get_stalls(hawkerId):
     url = f"{MENU_SERVICE_URL}/hawkerCenters/{hawkerId}/stalls"
@@ -89,9 +76,7 @@ def proxy_get_stalls(hawkerId):
     else:
         return jsonify({"error": f"Failed to retrieve stalls. Status code: {r.status_code}"}), r.status_code
 
-##############################################
 # Proxy GET /hawkerCenters/<hawkerId>/stalls/<stallId>/dishes
-##############################################
 @app.route("/hawkerCenters/<string:hawkerId>/stalls/<string:stallId>/dishes", methods=["GET"])
 def proxy_get_dishes(hawkerId, stallId):
     url = f"{MENU_SERVICE_URL}/hawkerCenters/{hawkerId}/stalls/{stallId}/dishes"
@@ -102,7 +87,6 @@ def proxy_get_dishes(hawkerId, stallId):
         return jsonify({"error": f"Failed to retrieve dishes. Status code: {r.status_code}"}), r.status_code
 
 
-###############################################################################
 # 2) POST /order - Accept Orders, Forward Payment Payload, and Publish Notifications
 ###############################################################################
 @app.route("/order", methods=["POST"])
@@ -188,7 +172,6 @@ def create_order():
         print(f"Error in create_order: {e}")
         return jsonify({"error": str(e)}), 500
 
-###############################################################################
 # 3) GET /order/status/<orderId> - Retrieve Order Status
 ###############################################################################
 @app.route("/order/status/<string:orderId>", methods=["GET"])
@@ -211,7 +194,6 @@ def get_order_status(orderId):
     else:
         return jsonify({"error": "Order not found"}), 404
 
-###############################################################################
 # Main - Run the Flask Application
 ###############################################################################
 if __name__ == "__main__":
