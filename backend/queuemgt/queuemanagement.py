@@ -55,9 +55,10 @@ def process_order(ch, method, properties, body):
             stall_doc = stall_ref.get()
             if not stall_doc.exists:
                 stall_ref.set({"estimatedWaitTime": 0})  # Init if needed
+                stall_ref.set({"totalEarned": 0}) 
 
             # Reference to the order subcollection
-            order_ref = stall_ref.collection("order").document(orderDetails["orderId"])
+            order_ref = stall_ref.collection("orders").document(orderDetails["orderId"])
             
             # Build the dish data
             dish_data = {}
@@ -68,7 +69,6 @@ def process_order(ch, method, properties, body):
             }
 
             for dish_info in data["dishes"]:
-
                 dish_name = dish_info["name"]
                 wait_time = dish_info["waitTime"]
                 quantity = dish_info["quantity"]
@@ -95,7 +95,7 @@ def process_order(ch, method, properties, body):
                 "estimatedWaitTime": firestore.Increment(total_wait_time)
             })
 
-        print("Order {orderDetails['orderId']}")
+        print(f"Added Order {orderDetails['orderId']}")
     except Exception as e:
         print(f"Error processing order: {e}")
 
@@ -152,7 +152,7 @@ def get_estimated_wait_time(hawkerCenter, hawkerStall):
             "hawkerCenter": hawkerCenter,
             "hawkerStall": hawkerStall,
             "waitTime": estimated_wait_time
-        })
+        }),200
 
     except Exception as e:
         print(f"Error fetching wait time: {e}")
@@ -178,7 +178,7 @@ def get_total_earned(hawkerCenter, hawkerStall):
             "hawkerCenter": hawkerCenter,
             "hawkerStall": hawkerStall,
             "totalEarned": total_earned
-        })
+        }),200
 
     except Exception as e:
         print(f"Error fetching wait time: {e}")
@@ -219,7 +219,7 @@ def get_all_orders(hawkerCenter, hawkerStall):
         for order in orders:
             result[order.id] = order.to_dict()
 
-        return jsonify(result)
+        return jsonify(result),200
     
     except Exception as e:
         print(f"Error fetching all orders: {e}")
@@ -245,7 +245,7 @@ def get_completed_orders(hawkerCenter, hawkerStall):
             if is_order_completed(order_data):
                 completed_orders[order.id] = order_data
 
-        return jsonify(completed_orders)
+        return jsonify(completed_orders),200
     
     except Exception as e:
         print(f"Error fetching completed orders: {e}")
@@ -271,7 +271,7 @@ def get_pending_orders(hawkerCenter, hawkerStall):
             if not is_order_completed(order_data):
                 pending_orders[order.id] = order_data
 
-        return jsonify(pending_orders)
+        return jsonify(pending_orders),200
     
     except Exception as e:
         print(f"Error fetching pending orders: {e}")
@@ -447,19 +447,19 @@ if __name__ == '__main__':
     app.run(debug=True, port=5000, use_reloader=False)
 
 
-# orderDetails = {
+# orderDetails ={
 #     "token": {
-#         "card": {...},
-#         "client_ip": '58.182.136.164',
+#         "card": {},
+#         "client_ip": "58.182.136.164",
 #         "created": 1743752552,
-#         "id": 'tok_1RA4tYFKfP7LOez7aq4SeSmC',
+#         "id": "tok_1RAUM2FKfP7LOez7hS0UrTQH",
 #         "livemode": False,
-#         "object": 'token',
-#         "type": 'card',
+#         "object": "token",
+#         "type": "card",
 #         "used": False
 #     },
-#     "amount": 5.45,
-#     "hawkerCenter": "maxwell Food centre",
+#     "amount": 14,
+#     "hawkerCenter": "test",
 #     "orderId": "order_003",
 #     "phoneNumber": "+6512345678",
 #     "userId": "user_002",
@@ -469,8 +469,8 @@ if __name__ == '__main__':
 #             {
 #             "name": "Fried Carrot Cake",
 #             "quantity": 1,
-#             "waitTime": 6
-#             'price': 3.50
+#             "waitTime": 6,
+#             "price": 3.50
 #             }
 #         ]
 #         },
@@ -479,16 +479,75 @@ if __name__ == '__main__':
 #             {
 #             "name": "Chicken Rice",
 #             "quantity": 2,
-#             "waitTime": 10
-#             'price': 3.50
+#             "waitTime": 10,
+#             "price": 7
 #             },
 #             {
 #             "name": "Iced Tea",
 #             "quantity": 1,
-#             "waitTime": 2
-#             'price': 3.50
+#             "waitTime": 2,
+#             "price": 3.50
 #             }
 #         ]
 #     }
 #     }
 # }
+
+# def process_order2(orderDetails):
+#     try:
+#         print(f"Received order: {orderDetails['orderId']}")
+                
+#         # Loop through each stall
+#         for stall_name, data in orderDetails["stalls"].items():
+#             # Reference to the stall document
+#             stall_ref = db.collection(orderDetails["hawkerCenter"]).document(stall_name)
+
+#             # Ensure estimatedWaitTime is added if not present
+#             stall_doc = stall_ref.get()
+#             if not stall_doc.exists:
+#                 stall_ref.set({"estimatedWaitTime": 0})  # Init if needed
+#                 stall_ref.set({"totalEarned": 0}) 
+
+#             # Reference to the order subcollection
+#             order_ref = stall_ref.collection("orders").document(orderDetails["orderId"])
+            
+#             # Build the dish data
+#             dish_data = {}
+#             total_wait_time = 0
+#             order_data = {
+#                 "userId": orderDetails["userId"],
+#                 "phoneNumber": orderDetails["phoneNumber"]
+#             }
+
+#             for dish_info in data["dishes"]:
+#                 dish_name = dish_info["name"]
+#                 wait_time = dish_info["waitTime"]
+#                 quantity = dish_info["quantity"]
+#                 price = dish_info["price"]
+                
+#                 dish_data[dish_name] = {
+#                     "completed": False,
+#                     "quantity": quantity,
+#                     "time_started": firestore.SERVER_TIMESTAMP,
+#                     "time_completed": None,
+#                     "waitTime": wait_time,
+#                     "price": price,
+#                 }
+
+#                 total_wait_time += wait_time * quantity
+#                 order_data.update(dish_data) 
+
+#             # Add dish data under the order document
+
+#             order_ref.set(order_data)
+
+#             # Optionally increment estimatedWaitTime (basic example)
+#             stall_ref.update({
+#                 "estimatedWaitTime": firestore.Increment(total_wait_time)
+#             })
+
+#         print(f"Added Order {orderDetails['orderId']}")
+#     except Exception as e:
+#         print(f"Error processing order: {e}")
+
+# process_order2(orderDetails)
