@@ -27,9 +27,9 @@ db = firestore.Client(project=project_id, credentials=cred, database='queue')
 
 # RabbitMQ config
 RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST")
+print("RABBITMQ_HOST:", RABBITMQ_HOST)
 EXCHANGE_NAME = 'queue_exchange'
 QUEUE_NAME = 'O_queue'
-# print(RABBITMQ_HOST)
 connection = pika.BlockingConnection(pika.ConnectionParameters(RABBITMQ_HOST))
 channel = connection.channel()
 ###############################################################################
