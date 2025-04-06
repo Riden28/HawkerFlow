@@ -66,7 +66,7 @@ def get_dishes_in_stall(hawkerId, stallId):
     stall_doc_ref = hawker_doc_ref.collection("Stalls").document(stallId)
     if not stall_doc_ref.get().exists:
         return jsonify({"error": f"Stall '{stallId}' not found in hawker center '{hawkerId}'."}), 404
-    dishes_ref = stall_doc_ref.collection("Dishes")
+    dishes_ref = stall_doc_ref.collection("dishes")
     docs = dishes_ref.stream()
     dishes = []
     for doc in docs:
