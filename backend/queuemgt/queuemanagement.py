@@ -148,32 +148,10 @@ def get_estimated_wait_time(hawkerCenter, hawkerStall):
         abort(500, description="Internal server error.")
 
 #GET - Scenario 2: Hawker UI pulls complete order list
-@app.route('/<hawkerCenter>/<hawkerStall>/orders', methods=['GET'])
-def get_all_orders(hawkerCenter, hawkerStall):
-    try:
-        doc_ref = db.collection(hawkerCenter).document(hawkerStall)
-        doc = doc_ref.get()
-
-        if not doc.exists:
-            abort(404, description="Hawker stall not found.")
-
-        orders_ref = doc_ref.collection("order")
-        orders = orders_ref.stream()
-        
-        result = {}
-
-        for order in orders:
-            result[order.id] = order.to_dict()
-
-        return jsonify(result)
-    
-    except Exception as e:
-        print(f"Error fetching orders: {e}")
-        abort(500, description="Internal server error.")
-
-#PATCH - Scenario 2: Mark Order as Completed
 def is_order_completed(order_data):
     ignore = {"userId", "phoneNumber"}
+
+    # print(f"Checking order: {order_data}")
 
     for key, value in order_data.items():
         if key in ignore: #skip fields 
@@ -184,6 +162,86 @@ def is_order_completed(order_data):
             return False
     return True
 
+def get_estimated_wait_time(hawkerCenter, hawkerStall):
+        abort(500, description="Internal server error.")
+
+#GET - Scenario 2: Hawker UI pulls complete order list
+@app.route('/<hawkerCenter>/<hawkerStall>/orders', methods=['GET'])
+def get_all_orders(hawkerCenter, hawkerStall):
+    try:
+        doc_ref = db.collection(hawkerCenter).document(hawkerStall)
+        doc = doc_ref.get()
+
+        if not doc.exists:
+            abort(404, description="Hawker stall not found.")
+
+        orders_ref = doc_ref.collection("orders")
+        orders = orders_ref.stream()
+        
+        result = {}
+
+        for order in orders:
+            result[order.id] = order.to_dict()
+
+        return jsonify(result)
+    
+    except Exception as e:
+        print(f"Error fetching all orders: {e}")
+        abort(500, description="Internal server error.")
+
+@app.route('/<hawkerCenter>/<hawkerStall>/completed_orders', methods=['GET'])
+def get_completed_orders(hawkerCenter, hawkerStall):
+    try:
+        doc_ref = db.collection(hawkerCenter).document(hawkerStall)
+        doc = doc_ref.get()
+
+        if not doc.exists:
+            abort(404, description="Hawker stall not found.")
+
+        orders_ref = doc_ref.collection("orders")
+        orders = orders_ref.stream()
+        
+        completed_orders = {}
+
+        for order in orders:
+            order_data = order.to_dict()
+            # print(order_data)
+            if is_order_completed(order_data):
+                completed_orders[order.id] = order_data
+
+        return jsonify(completed_orders)
+    
+    except Exception as e:
+        print(f"Error fetching completed orders: {e}")
+        abort(500, description="Internal server error.")
+    
+@app.route('/<hawkerCenter>/<hawkerStall>/pending_orders', methods=['GET'])
+def get_pending_orders(hawkerCenter, hawkerStall):
+    try:
+        doc_ref = db.collection(hawkerCenter).document(hawkerStall)
+        doc = doc_ref.get()
+
+        if not doc.exists:
+            abort(404, description="Hawker stall not found.")
+
+        orders_ref = doc_ref.collection("orders")
+        orders = orders_ref.stream()
+        
+        pending_orders = {}
+
+        for order in orders:
+            order_data = order.to_dict()
+
+            if not is_order_completed(order_data):
+                pending_orders[order.id] = order_data
+
+        return jsonify(pending_orders)
+    
+    except Exception as e:
+        print(f"Error fetching pending orders: {e}")
+        abort(500, description="Internal server error.")
+
+#PATCH - Scenario 2: Mark Order as Completed
 def build_activity_log_payload(order_data):
     activity_log = {}
 
@@ -270,7 +328,7 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
             #publish_message(f"{orderId}.customer", customer_data)
 
             #deletes the order from db 
-            order_ref.delete()
+            # order_ref.delete()
 
             return jsonify({
                 "message": "Order fully completed and notifications published.",
@@ -283,7 +341,7 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
         }), 200
 
     except Exception as e:
-        print(f"Error completing dish: {e}")
+        print(f"Error marking dish as complete: {e}")
         return {"error": "Internal server error"}, 500
 
 if __name__ == '__main__':
