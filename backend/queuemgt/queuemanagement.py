@@ -152,7 +152,7 @@ def get_estimated_wait_time(hawkerCenter, hawkerStall):
             "hawkerCenter": hawkerCenter,
             "hawkerStall": hawkerStall,
             "waitTime": estimated_wait_time
-        })
+        }),200
 
     except Exception as e:
         print(f"Error fetching wait time: {e}")
@@ -178,7 +178,7 @@ def get_total_earned(hawkerCenter, hawkerStall):
             "hawkerCenter": hawkerCenter,
             "hawkerStall": hawkerStall,
             "totalEarned": total_earned
-        })
+        }),200
 
     except Exception as e:
         print(f"Error fetching wait time: {e}")
@@ -219,7 +219,7 @@ def get_all_orders(hawkerCenter, hawkerStall):
         for order in orders:
             result[order.id] = order.to_dict()
 
-        return jsonify(result)
+        return jsonify(result),200
     
     except Exception as e:
         print(f"Error fetching all orders: {e}")
@@ -245,7 +245,7 @@ def get_completed_orders(hawkerCenter, hawkerStall):
             if is_order_completed(order_data):
                 completed_orders[order.id] = order_data
 
-        return jsonify(completed_orders)
+        return jsonify(completed_orders),200
     
     except Exception as e:
         print(f"Error fetching completed orders: {e}")
@@ -271,7 +271,7 @@ def get_pending_orders(hawkerCenter, hawkerStall):
             if not is_order_completed(order_data):
                 pending_orders[order.id] = order_data
 
-        return jsonify(pending_orders)
+        return jsonify(pending_orders),200
     
     except Exception as e:
         print(f"Error fetching pending orders: {e}")
