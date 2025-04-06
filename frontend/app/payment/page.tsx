@@ -102,21 +102,10 @@ export default function PaymentPage() {
       const requestData = {
         createdAt: new Date().toISOString(),
         phoneNumber,
-        // Send a trimmed token object containing only the necessary fields:
-        token: {
-          id: cardToken.id,
-          type: cardToken.type,
-          card: {
-            id: cardToken.card.id,
-            brand: cardToken.card.brand,
-            last4: cardToken.card.last4,
-            exp_month: cardToken.card.exp_month,
-            exp_year: cardToken.card.exp_year
-          }
-        },
+        // Send the full token object as returned from Stripe
+        token: cardToken,
         items: orderItems,
         userId: "user123",
-        // For demonstration, grouping all items under one stall name:
         stalls: {
           [orderItems[0].stallName]: {
             dishes: orderItems

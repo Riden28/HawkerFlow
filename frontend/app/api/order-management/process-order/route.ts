@@ -17,7 +17,7 @@ interface OrderItem {
 }
 
 // Initialize Stripe with your secret key
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+const stripe = new Stripe(process.env.STRIPE_API_KEY!, {
   apiVersion: "2025-02-24.acacia"
 })
 
@@ -29,9 +29,16 @@ export async function POST(request: Request) {
     const { phoneNumber, token, items, specialInstructions, orderSummary } = body
 
     // Validate required fields (including orderSummary)
-    if (!phoneNumber || !token || !items || !Array.isArray(items) || items.length === 0 || !orderSummary || typeof orderSummary.total !== 'number') {
+    if (!phoneNumber || !items || !Array.isArray(items) || items.length === 0 || !orderSummary || typeof orderSummary.total !== 'number') {
       return NextResponse.json(
         { success: false, message: "Missing or invalid required fields" },
+        { status: 400 }
+      )
+    }
+    // Early check for a valid token
+    if (!token || !token.id) {
+      return NextResponse.json(
+        { success: false, message: "Invalid or missing Stripe token" },
         { status: 400 }
       )
     }

@@ -11,8 +11,10 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-stripe.api_key = os.environ.get("STRIPE_API_KEY")
 # stripe.api_key = "pk_test_51R80VkFKfP7LOez7sDTq82hBlhj8mZFJRFcFmb2Y35saQ1FVMVUIOdfX8EzGEsDRYReFZ3CKzP7lFeONCQL2XldX00o7spgvVN"
+stripe.api_key = os.environ.get("STRIPE_API_KEY")
+if not stripe.api_key:
+    raise ValueError("StripE secret key is missing! Please set STRIPE_API_KEY in your environment.")
 
 @app.route('/payment', methods=['POST'])
 def payment():
@@ -36,7 +38,7 @@ def payment():
             currency="sgd",
             payment_method=payment_method.id,  # Use the created PaymentMethod ID
             confirm=True, # Confirm the payment immediately
-            automatic_payment_methods={"enabled": True, "allow_redirects": 'never'}
+            automatic_payment_methods={"enabled": True, "allow_redirects": False}
         )
         print(payment_intent)
         # Return a success response

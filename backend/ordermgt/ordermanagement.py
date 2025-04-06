@@ -122,17 +122,20 @@ def create_order():
             payment_resp = requests.post(payment_service_url, json=payment_payload, timeout=5)
             if payment_resp.status_code == 200:
                 payment_result = payment_resp.json()
-                payment_data = payment_result.get("data")
-                payment_status = payment_data.get("status")
+                payment_data = payment_result.get("data", {})
+                payment_status = payment_data.get("status", "failed")
                 print(f"PAYMENT service responded with status code: {payment_resp.status_code}")
             else:
-                payment_status = payment_data.get("status")
+                try:
+                    payment_result = payment_resp.json()
+                    payment_data = payment_result.get("data", {})
+                    payment_status = payment_data.get("status", "failed")
+                except Exception as e:
+                    payment_status = "failed"
                 print(f"PAYMENT service responded with status code: {payment_resp.status_code}")
         except Exception as e:
             print(f"Error calling PAYMENT microservice: {e}")
             payment_status = "failed"
-        
-        
 
         #######################################################################
         # Publish Notifications via RabbitMQ (Asynchronous Messaging)
