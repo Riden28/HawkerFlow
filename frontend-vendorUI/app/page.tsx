@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { ChevronDown, Clock, Filter, MoreHorizontal, Search, CheckCircle, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,151 +19,87 @@ import { VendorNavbar } from "@/components/vendor-navbar"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { formatTime } from "@/lib/utils"
+import { getStallOrders, getWaitTime, markDishComplete, type Order } from "@/lib/api"
 
-// Sample orders data for the vendor
-const orders = [
-  {
-    id: "HWK-1234",
-    customerName: "John Lee",
-    date: "2023-06-15T14:30:00",
-    status: "pending",
-    total: 15.5,
-    items: [
-      {
-        id: 1,
-        name: "Chicken Rice",
-        quantity: 1,
-        price: 5.5,
-        options: [
-          { name: "Meat Type", choice: "Steamed Chicken", price: 0 },
-          { name: "Rice Type", choice: "White Rice", price: 0 },
-        ],
-        specialInstructions: "Less oil please",
-        completed: false,
-      },
-      {
-        id: 2,
-        name: "Char Kway Teow",
-        quantity: 2,
-        price: 5.0,
-        options: [{ name: "Spice Level", choice: "Medium", price: 0 }],
-        specialInstructions: "",
-        completed: false,
-      },
-    ],
-    paymentMethod: "Credit Card",
-    estimatedTime: 15,
-    orderNumber: 42,
-  },
-  {
-    id: "HWK-1235",
-    customerName: "Sarah Tan",
-    date: "2023-06-15T14:35:00",
-    status: "pending",
-    total: 12.0,
-    items: [
-      {
-        id: 3,
-        name: "Laksa",
-        quantity: 1,
-        price: 7.0,
-        options: [
-          { name: "Spice Level", choice: "Extra Spicy", price: 0.5 },
-          { name: "Noodle Type", choice: "Thick Noodles", price: 0 },
-        ],
-        specialInstructions: "Extra cockles please",
-        completed: false,
-      },
-      {
-        id: 4,
-        name: "Teh Tarik",
-        quantity: 1,
-        price: 1.8,
-        options: [{ name: "Sweetness", choice: "Less Sweet", price: 0 }],
-        specialInstructions: "",
-        completed: true,
-      },
-      {
-        id: 5,
-        name: "Roti Prata",
-        quantity: 1,
-        price: 3.5,
-        options: [{ name: "Type", choice: "Plain", price: 0 }],
-        specialInstructions: "",
-        completed: false,
-      },
-    ],
-    paymentMethod: "PayNow",
-    estimatedTime: 20,
-    orderNumber: 43,
-  },
-  {
-    id: "HWK-1236",
-    customerName: "Michael Wong",
-    date: "2023-06-15T14:40:00",
-    status: "completed",
-    total: 8.5,
-    items: [
-      {
-        id: 6,
-        name: "Nasi Lemak",
-        quantity: 1,
-        price: 5.5,
-        options: [{ name: "Protein", choice: "Fried Chicken", price: 1.0 }],
-        specialInstructions: "Extra sambal",
-        completed: true,
-      },
-      {
-        id: 7,
-        name: "Iced Milo",
-        quantity: 1,
-        price: 2.0,
-        options: [],
-        specialInstructions: "",
-        completed: true,
-      },
-    ],
-    paymentMethod: "Cash",
-    estimatedTime: 10,
-    orderNumber: 44,
-  },
-  {
-    id: "HWK-1237",
-    customerName: "Lisa Chen",
-    date: "2023-06-15T14:45:00",
-    status: "pending",
-    total: 22.0,
-    items: [
-      {
-        id: 8,
-        name: "Hokkien Mee",
-        quantity: 2,
-        price: 6.0,
-        options: [{ name: "Size", choice: "Large", price: 1.0 }],
-        specialInstructions: "",
-        completed: false,
-      },
-      {
-        id: 9,
-        name: "Satay",
-        quantity: 10,
-        price: 1.0,
-        options: [{ name: "Meat", choice: "Mixed (Chicken & Beef)", price: 0 }],
-        specialInstructions: "Extra peanut sauce",
-        completed: false,
-      },
-    ],
-    paymentMethod: "Credit Card",
-    estimatedTime: 25,
-    orderNumber: 45,
-  },
-]
+// Constants for the current hawker center and stall
+const HAWKER_CENTER = "Maxwell Food Centre"
+const HAWKER_STALL = "Chicken Rice Stall"
+
+interface ProcessedOrder {
+  id: string
+  customerName: string
+  date: string
+  status: "pending" | "completed"
+  total: number
+  items: {
+    id: number
+    name: string
+    quantity: number
+    waitTime: number
+    completed: boolean
+    specialInstructions?: string
+  }[]
+  paymentMethod: string
+  orderNumber: number
+}
 
 export default function VendorDashboard() {
   const [searchQuery, setSearchQuery] = useState("")
-  const [orderData, setOrderData] = useState(orders)
+  const [orderData, setOrderData] = useState<ProcessedOrder[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Filter orders based on active tab and search query
+  // Fetch orders from the API
+  useEffect(() => {
+    async function fetchOrders() {
+      try {
+        setIsLoading(true)
+        setError(null)
+        const ordersData = await getStallOrders(HAWKER_CENTER, HAWKER_STALL)
+        
+        // Process the orders into the format we need
+        const processedOrders: ProcessedOrder[] = Object.entries(ordersData).map(([orderId, order], index) => {
+          const items = Object.entries(order)
+            .filter(([key, value]) => typeof value === 'object' && value !== null && 'completed' in value)
+            .map(([dishName, details], itemIndex) => ({
+              id: itemIndex + 1,
+              name: dishName,
+              quantity: details.quantity,
+              waitTime: details.waitTime,
+              completed: details.completed,
+              specialInstructions: "", // Add if available in your API
+            }))
+
+          const allCompleted = items.every(item => item.completed)
+          const total = items.reduce((sum, item) => sum + (item.waitTime * item.quantity), 0)
+
+          return {
+            id: orderId,
+            customerName: `Customer ${order.phoneNumber}`, // Use actual name if available
+            date: new Date().toISOString(), // Use actual order time if available
+            status: allCompleted ? "completed" : "pending",
+            total: total,
+            items: items,
+            paymentMethod: "Not specified", // Add if available in your API
+            orderNumber: index + 1,
+          }
+        })
+
+        setOrderData(processedOrders)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch orders')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchOrders()
+    // Set up polling every 30 seconds
+    const interval = setInterval(fetchOrders, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Filter orders based on search query
   const filteredOrders = orderData.filter((order) => {
     const matchesSearch =
       order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -172,41 +108,93 @@ export default function VendorDashboard() {
   })
 
   // Handle marking an item as completed
-  const handleItemCompletion = (orderId: string, itemId: number, completed: boolean) => {
-    setOrderData((prevOrders) =>
-      prevOrders.map((order) => {
-        if (order.id === orderId) {
-          const updatedItems = order.items.map((item) => (item.id === itemId ? { ...item, completed } : item))
+  const handleItemCompletion = async (orderId: string, itemName: string, completed: boolean) => {
+    try {
+      if (completed) {
+        await markDishComplete(HAWKER_CENTER, HAWKER_STALL, orderId, itemName)
+      }
+      
+      setOrderData((prevOrders) =>
+        prevOrders.map((order) => {
+          if (order.id === orderId) {
+            const updatedItems = order.items.map((item) => 
+              item.name === itemName ? { ...item, completed } : item
+            )
 
-          // Check if all items are completed
-          const allCompleted = updatedItems.every((item) => item.completed)
+            // Check if all items are completed
+            const allCompleted = updatedItems.every((item) => item.completed)
 
-          return {
-            ...order,
-            items: updatedItems,
-            status: allCompleted ? "completed" : "pending",
+            return {
+              ...order,
+              items: updatedItems,
+              status: allCompleted ? "completed" : "pending",
+            }
           }
-        }
-        return order
-      }),
-    )
+          return order
+        }),
+      )
+    } catch (err) {
+      console.error('Failed to update item completion:', err)
+      // You might want to show an error toast here
+    }
   }
 
   // Handle marking an entire order as completed
-  const handleOrderCompletion = (orderId: string, completed: boolean) => {
-    setOrderData((prevOrders) =>
-      prevOrders.map((order) => {
-        if (order.id === orderId) {
-          const updatedItems = order.items.map((item) => ({ ...item, completed }))
+  const handleOrderCompletion = async (orderId: string, completed: boolean) => {
+    try {
+      const order = orderData.find(o => o.id === orderId)
+      if (!order) return
 
-          return {
-            ...order,
-            items: updatedItems,
-            status: completed ? "completed" : "pending",
-          }
+      // Mark all items as completed
+      for (const item of order.items) {
+        if (!item.completed && completed) {
+          await markDishComplete(HAWKER_CENTER, HAWKER_STALL, orderId, item.name)
         }
-        return order
-      }),
+      }
+
+      setOrderData((prevOrders) =>
+        prevOrders.map((order) => {
+          if (order.id === orderId) {
+            const updatedItems = order.items.map((item) => ({ ...item, completed }))
+
+            return {
+              ...order,
+              items: updatedItems,
+              status: completed ? "completed" : "pending",
+            }
+          }
+          return order
+        }),
+      )
+    } catch (err) {
+      console.error('Failed to update order completion:', err)
+      // You might want to show an error toast here
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <VendorNavbar />
+        <main className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center h-64">
+            <p className="text-lg text-muted-foreground">Loading orders...</p>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background">
+        <VendorNavbar />
+        <main className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center h-64">
+            <p className="text-lg text-red-500">Error: {error}</p>
+          </div>
+        </main>
+      </div>
     )
   }
 
@@ -383,7 +371,7 @@ export default function VendorDashboard() {
                                 className="mt-1 mr-3"
                                 checked={item.completed}
                                 onCheckedChange={(checked) =>
-                                  handleItemCompletion(order.id, item.id, checked as boolean)
+                                  handleItemCompletion(order.id, item.name, checked as boolean)
                                 }
                               />
                               <div className="flex-1">
@@ -395,19 +383,9 @@ export default function VendorDashboard() {
                                     {item.quantity}x {item.name}
                                   </label>
                                   <span className={item.completed ? "text-muted-foreground" : ""}>
-                                    ${(item.price * item.quantity).toFixed(2)}
+                                    ${(item.waitTime * item.quantity).toFixed(2)}
                                   </span>
                                 </div>
-                                {item.options && item.options.length > 0 && (
-                                  <div className="text-sm text-muted-foreground mt-1">
-                                    {item.options.map((option, idx) => (
-                                      <div key={idx}>
-                                        {option.name}: {option.choice}
-                                        {option.price > 0 && ` (+$${option.price.toFixed(2)})`}
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
                                 {item.specialInstructions && (
                                   <div className="flex items-start mt-1">
                                     <AlertCircle className="h-3 w-3 text-amber-500 mr-1 mt-0.5" />
@@ -489,19 +467,9 @@ export default function VendorDashboard() {
                                     {item.quantity}x {item.name}
                                   </span>
                                   <span className="text-muted-foreground">
-                                    ${(item.price * item.quantity).toFixed(2)}
+                                    ${(item.waitTime * item.quantity).toFixed(2)}
                                   </span>
                                 </div>
-                                {item.options && item.options.length > 0 && (
-                                  <div className="text-sm text-muted-foreground mt-1">
-                                    {item.options.map((option, idx) => (
-                                      <div key={idx}>
-                                        {option.name}: {option.choice}
-                                        {option.price > 0 && ` (+$${option.price.toFixed(2)})`}
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
                                 {item.specialInstructions && (
                                   <div className="flex items-start mt-1">
                                     <AlertCircle className="h-3 w-3 text-amber-500 mr-1 mt-0.5" />
