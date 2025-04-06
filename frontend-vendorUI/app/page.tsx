@@ -391,19 +391,15 @@ export default function VendorDashboard() {
                         <div className="flex justify-between items-start">
                           <div>
                             <CardTitle className="text-lg flex items-center">
-                              Order #{order.orderNumber}
+                              #{order.id}
                               <Badge className="ml-2" variant="default">
                                 Pending
                               </Badge>
                             </CardTitle>
-                            <CardDescription>
-                              {order.id} • {formatTime(order.date)} • {order.customerName}
-                            </CardDescription>
                           </div>
                           <div className="flex items-center">
                             <div className="text-right mr-4">
                               <p className="font-medium">${order.total.toFixed(2)}</p>
-                              <p className="text-xs text-muted-foreground">{order.paymentMethod}</p>
                             </div>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
