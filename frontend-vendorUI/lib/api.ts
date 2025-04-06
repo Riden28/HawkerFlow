@@ -1,5 +1,7 @@
 // Instead of calling the backend directly, we'll use Next.js proxy
-const API_BASE_URL = '/api'
+// const API_BASE_URL = '/app'
+const API_BASE_URL = 'http://localhost:5000'
+const API_BASE_URL_ORDER = 'http://localhost:5003'
 
 // Types
 export interface OrderItem {
@@ -16,6 +18,45 @@ export interface Order {
   phoneNumber: string
   [key: string]: OrderItem | string // For dynamic dish names
 }
+//API Functions for orders
+export async function getHawkerCenterNames(): Promise<string[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL_ORDER}/hawkerCenters`)
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch hawker centers')
+    }
+
+    const data = await response.json()
+
+    // Extract just the centerName values
+    const centerNames = data.map((center: any) => center.centerName.trim())
+
+    return centerNames
+  } catch (error) {
+    console.error('Error fetching hawker center names:', error)
+    throw error
+  }
+}
+
+
+export async function getStallsForHawkerCenter(hawkerId: string): Promise<any[]> {
+  try {
+    const encodedId = encodeURIComponent(hawkerId)
+    const response = await fetch(`${API_BASE_URL_ORDER}/hawkerCenters/${encodedId}/stalls`)
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch stalls for hawker center')
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error('Error fetching stalls:', error)
+    throw error
+  }
+}
+
+
 
 // API Functions
 export async function getPendingOrders(hawkerCenter: string, hawkerStall: string): Promise<Record<string, Order>> {

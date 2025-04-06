@@ -22,7 +22,12 @@ import { formatTime } from "@/lib/utils"
 import { getPendingOrders, getCompletedOrders, markDishComplete, type Order } from "@/lib/api"
 
 // Constants for the current hawker center and stall
-const HAWKER_CENTER = "Maxwell Food Centre"
+const HAWKER_ARRAY = [
+  "Chinatown Complex Food Center",
+  "Lau Pa Sat",
+  "Maxwell Food Center",
+  "Old Airport Road Food Center"
+]
 const HAWKER_STALL = "Chicken Rice Stall"
 
 interface OrderDetails {
@@ -80,26 +85,28 @@ export default function VendorDashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const [selectedHawkerCenter, setSelectedHawkerCenter] = useState("Maxwell Food Center")
+
   // Fetch orders from the API
   useEffect(() => {
     async function fetchOrders() {
       try {
         setIsLoading(true)
         setError(null)
-        
+
         // Fetch both pending and completed orders
         const [pendingOrders, completedOrders] = await Promise.all([
-          getPendingOrders(HAWKER_CENTER, HAWKER_STALL),
-          getCompletedOrders(HAWKER_CENTER, HAWKER_STALL)
+          getPendingOrders(selectedHawkerCenter, HAWKER_STALL),
+          getCompletedOrders(selectedHawkerCenter, HAWKER_STALL)
         ])
-        
+
         // Process pending orders
         const processedPendingOrders: ProcessedOrder[] = Object.entries(pendingOrders).map(([orderId, rawOrder], index) => {
           const order = rawOrder as ApiOrder
           const orderEntries = Object.entries(order)
-          
+
           console.log('Processing order:', orderId, 'Raw order data:', rawOrder)
-          
+
           const dishEntries = orderEntries.filter(([key, value]) => {
             return key !== 'userId' && key !== 'phoneNumber' && isOrderDetails(value)
           }) as [string, OrderDetails][]
@@ -210,7 +217,7 @@ export default function VendorDashboard() {
     // Set up polling every 30 seconds
     const interval = setInterval(fetchOrders, 30000)
     return () => clearInterval(interval)
-  }, [])
+  }, [selectedHawkerCenter])
 
   // Filter orders based on search query
   const filteredOrders = orderData.filter((order) => {
@@ -229,13 +236,13 @@ export default function VendorDashboard() {
           itemName,
           originalName: itemName
         })
-        await markDishComplete(HAWKER_CENTER, HAWKER_STALL, orderId, itemName)
+        await markDishComplete(selectedHawkerCenter, HAWKER_STALL, orderId, itemName)
       }
-      
+
       setOrderData((prevOrders) =>
         prevOrders.map((order) => {
           if (order.id === orderId) {
-            const updatedItems = order.items.map((item) => 
+            const updatedItems = order.items.map((item) =>
               item.name === itemName ? { ...item, completed } : item
             )
 
@@ -266,7 +273,7 @@ export default function VendorDashboard() {
       // Mark all items as completed
       for (const item of order.items) {
         if (!item.completed && completed) {
-          await markDishComplete(HAWKER_CENTER, HAWKER_STALL, orderId, item.name)
+          await markDishComplete(selectedHawkerCenter, HAWKER_STALL, orderId, item.name)
         }
       }
 
@@ -327,6 +334,35 @@ export default function VendorDashboard() {
             <p className="text-muted-foreground">Manage your incoming and completed orders</p>
           </div>
           <div className="flex items-center mt-4 md:mt-0">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="ml-2">
+                  <Avatar className="h-8 w-8 mr-2">
+                    <AvatarFallback>
+                      {selectedHawkerCenter
+                        .split(" ")
+                        .map((word) => word[0])
+                        .join("")}
+                    </AvatarFallback>
+                  </Avatar>
+                  {selectedHawkerCenter}
+                  <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+
+              <DropdownMenuContent align="end">
+                {HAWKER_ARRAY.map((hawker) => (
+                  <DropdownMenuItem
+                    key={hawker}
+                    onClick={() => setSelectedHawkerCenter(hawker)}
+                  >
+                    {hawker}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="ml-2">
