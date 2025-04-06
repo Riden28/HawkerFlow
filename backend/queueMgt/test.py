@@ -36,8 +36,8 @@ db = firestore.Client(project=project_id, credentials=cred, database='queue')
 # 🔖 Configuration
 hawker_centres = [
     "Bukit Timah",
-    "Lagoon Hawker Centre",
-    "Maxwell Food Centre"
+    "Lagoon Hawker Center",
+    "Maxwell Food Center"
 ]
 
 stalls = {

@@ -1,9 +1,11 @@
 import os, pika, json, time
 import threading
+import pytz
 from dotenv import load_dotenv
 from flask import Flask, jsonify, abort
 from google.cloud import firestore
 from google.oauth2 import service_account
+from apscheduler.schedulers.background import BackgroundScheduler
 
 # Load environment variables (if using a .env file)
 load_dotenv()
@@ -29,8 +31,9 @@ QUEUE_NAME = 'O_queue'
 connection = pika.BlockingConnection(pika.ConnectionParameters(RABBITMQ_HOST))
 channel = connection.channel()
 
-#consume=====================================================================================================================================
-
+###############################################################################
+#Consume from rabbitmq
+###############################################################################
 #Consuming from RabbitMQ
 def process_order(ch, method, properties, body):
     try:
@@ -101,9 +104,9 @@ def start_rabbitmq_consumer():
     except KeyboardInterrupt:
         print("Stopped consuming.")
         channel.stop_consuming()
-
-#publisher=====================================================================================================================================
-
+###############################################################################
+#Publisher
+###############################################################################
 # RabbitMQ publish function
 def publish_message(routing_key: str, message: dict):
     try:
@@ -118,9 +121,10 @@ def publish_message(routing_key: str, message: dict):
     except Exception as e:
         print(f"Failed to publish {routing_key}: {e}")
 
-#APIs=====================================================================================================================================
-
-#GET - Scenario 1: Customer UI pulls current wait time
+###############################################################################
+#APIs
+###############################################################################
+#####GET - Scenario 1: Customer UI pulls current wait time######
 @app.route('/<hawkerCenter>/<hawkerStall>/waitTime', methods=['GET'])
 def get_estimated_wait_time(hawkerCenter, hawkerStall):
     try:
@@ -147,7 +151,7 @@ def get_estimated_wait_time(hawkerCenter, hawkerStall):
         print(f"Error fetching wait time: {e}")
         abort(500, description="Internal server error.")
 
-#GET - Scenario 2: Hawker UI pulls complete order list
+######GET - Scenario 2: Hawker UI pulls complete order list######
 def is_order_completed(order_data):
     ignore = {"userId", "phoneNumber"}
 
@@ -165,7 +169,7 @@ def is_order_completed(order_data):
 def get_estimated_wait_time(hawkerCenter, hawkerStall):
         abort(500, description="Internal server error.")
 
-#GET - Scenario 2: Hawker UI pulls complete order list
+######GET - Scenario 2: Hawker UI pulls complete order list######
 @app.route('/<hawkerCenter>/<hawkerStall>/orders', methods=['GET'])
 def get_all_orders(hawkerCenter, hawkerStall):
     try:
@@ -241,7 +245,7 @@ def get_pending_orders(hawkerCenter, hawkerStall):
         print(f"Error fetching pending orders: {e}")
         abort(500, description="Internal server error.")
 
-#PATCH - Scenario 2: Mark Order as Completed
+######PATCH - Scenario 2: Mark Order as Completed######
 def build_activity_log_payload(order_data):
     activity_log = {}
 
@@ -343,6 +347,50 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
     except Exception as e:
         print(f"Error marking dish as complete: {e}")
         return {"error": "Internal server error"}, 500
+    
+###############################################################################
+#deleting the orders from the db after 24hours
+###############################################################################
+def delete_orders_and_reset_wait_time():
+    # Function to recursively delete orders and reset wait times
+    def process_collection(collection_ref):
+        # Stream all documents in the current collection
+        documents = collection_ref.stream()
+        for document in documents:
+            # Attempt to get the 'orders' subcollection
+            orders_subcollection = document.reference.collection('orders')
+            orders = orders_subcollection.stream()
+            has_orders = False
+            
+            # Delete each order in the 'orders' subcollection
+            for order in orders:
+                has_orders = True
+                print(f"Deleting order {order.id} from {document.id} in collection '{collection_ref.id}'")
+                order.reference.delete()
+            
+            # If there were orders, reset the estimatedWaitTime
+            if has_orders:
+                document.reference.update({'estimatedWaitTime': 0})
+                print(f"Reset estimatedWaitTime to 0 for {document.id} in collection '{collection_ref.id}'")
+            
+            # Recursively process all subcollections
+            subcollections = document.reference.collections()
+            for subcollection in subcollections:
+                process_collection(subcollection)
+
+    # Retrieve all root-level collections and process each
+    root_collections = db.collections()
+    for root_collection in root_collections:
+        process_collection(root_collection)
+
+# Call the function to execute it
+delete_orders_and_reset_wait_time()
+
+
+scheduler = BackgroundScheduler()
+# Schedule the function to run daily at 3 AM
+scheduler.add_job(delete_orders_and_reset_wait_time, 'cron', hour=3, minute=0, second=0, timezone=pytz.timezone('Asia/Singapore'))
+scheduler.start()
 
 if __name__ == '__main__':
     if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':

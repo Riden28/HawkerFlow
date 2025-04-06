@@ -79,12 +79,6 @@ create_queue(
     routing_key="*.log",
 )
 
-create_queue(
-    channel=queue_channel,
-    exchange_name=queue_exchange_name, #queue_exchange
-    queue_name="Q_customer",
-    routing_key="*.customer",
-)
 
 #Order Management
 order_channel = create_exchange(
