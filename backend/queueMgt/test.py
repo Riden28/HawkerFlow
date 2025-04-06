@@ -41,7 +41,7 @@ hawker_centres = [
 ]
 
 stalls = {
-    "Chicken Rice Stall": ["Chicken", "Roasted Chicken", "Egg"],
+    "Chicken Rice Stall": ["Chicken Rice", "Roasted Chicken", "Egg", "Cucumber"],
     "Noodle Stall": ["Fishball Noodles", "Laksa", "Wanton Mee"]
 }
 

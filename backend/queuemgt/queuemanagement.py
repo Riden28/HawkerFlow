@@ -6,6 +6,7 @@ from flask import Flask, jsonify, abort
 from google.cloud import firestore
 from google.oauth2 import service_account
 from apscheduler.schedulers.background import BackgroundScheduler
+from flask_socketio import SocketIO, emit
 
 # Load environment variables (if using a .env file)
 load_dotenv()
@@ -15,6 +16,7 @@ app = Flask(__name__)
 # Retrieve environment variables for credentials and project
 service_account_path = os.environ.get("FIREBASE_SERVICE_ACCOUNT_KEY_PATH")
 project_id = os.environ.get("FIREBASE_PROJECT_ID")
+
 if not service_account_path or not project_id:
     raise ValueError("Required environment variables are not set.")
 
@@ -31,16 +33,13 @@ QUEUE_NAME = 'O_queue'
 connection = pika.BlockingConnection(pika.ConnectionParameters(RABBITMQ_HOST))
 channel = connection.channel()
 ###############################################################################
-#Consume from rabbitmq
+#Web Sockets!!!
 ###############################################################################
-
-
-
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 ###############################################################################
-#Consume from rabbitmq
+#Consume from RabbitMQ
 ###############################################################################
-#Consuming from RabbitMQ
 def process_order(ch, method, properties, body):
     try:
         # Decode the message body
@@ -279,7 +278,7 @@ def get_pending_orders(hawkerCenter, hawkerStall):
         abort(500, description="Internal server error.")
 
 ######PATCH - Scenario 2: Mark Order as Completed######
-def build_activity_log_payload(order_data):
+def build_activity_log_payload(order_data, hawkerCenter):
     activity_log = {}
 
     for dish_name, dish_info in order_data.items():
@@ -294,7 +293,8 @@ def build_activity_log_payload(order_data):
             "stallName": dish_info.get("stallName"),
             "quantity": dish_info.get("quantity"),
             "orderStartTime": start_time.isoformat(),
-            "orderEndTime": end_time.isoformat()
+            "orderEndTime": end_time.isoformat(),
+            "hawkerCenter": hawkerCenter
         }
     print(activity_log)
     return activity_log
@@ -310,9 +310,17 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
         order_data = order_doc.to_dict()
 
         # Get the wait time for this dish
+        userId = order_data.get(userId)
         dish_data = order_data.get(dishName)
         if not dish_data:
             return {"error": "Dish not found in order"}, 404
+        
+        # Mark dish as completed
+        updates = {
+            f"{dishName}.completed": True,
+            f"{dishName}.time_completed": firestore.SERVER_TIMESTAMP
+        }
+        order_ref.update(updates)
 
         dish_price= dish_data.get("price")
         if dish_price is None:
@@ -325,13 +333,6 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
         quantity = dish_data.get("quantity")
         if dish_time is None:
             return {"error": "Dish quantity not set"}, 400
-        
-        # Mark dish as completed
-        updates = {
-            f"{dishName}.completed": True,
-            f"{dishName}.time_completed": firestore.SERVER_TIMESTAMP
-        }
-        order_ref.update(updates)
 
         ##########################################################
         # Subtract dish wait time from stall's estimated wait time
@@ -367,7 +368,7 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
         #publish order
         if is_order_completed(updated_order_data):
             
-            log_data = build_activity_log_payload(updated_order_data)
+            log_data = build_activity_log_payload(updated_order_data, hawkerCenter)
             notif_data = {
                 "orderId": orderId,
                 "userId": updated_order_data.get("userId"),
@@ -377,11 +378,13 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
             publish_message(f"{orderId}.notif", notif_data)
             publish_message(f"{orderId}.log", log_data)
 
-            #front end code here to update front ended
-            #publish_message(f"{orderId}.customer", customer_data)
-
-            #deletes the order from db 
-            # order_ref.delete()
+            # Emit WebSocket message to inform user to collect order
+            socketio.emit(
+                'order_ready',
+                {'message': f'Your {dishName} order is ready for collection from {hawkerStall}!'},
+                namespace='/customer_updates',
+                room=userId
+            )
 
             return jsonify({
                 "message": "Order fully completed and notifications published.",
