@@ -8,43 +8,18 @@ from flask import Flask, jsonify
 from google.cloud import firestore
 from google.oauth2 import service_account
 
-# Load environment variables
+# Load .env from root (../../.env)
 load_dotenv()
 
+# Firebase credentials
+service_account_path = os.environ.get("FIREBASE_SERVICE_ACCOUNT_KEY_PATH")
+project_id = os.environ.get("FIREBASE_PROJECT_ID")
+database_id = "activity"
+
+cred = service_account.Credentials.from_service_account_file(service_account_path)
+db = firestore.Client(project=project_id, credentials=cred, database=database_id)
+
 app = Flask(__name__)
-
-# Retrieve individual fields from .env
-required_keys = [
-    "PROJECT_ID", "PRIVATE_KEY_ID", "PRIVATE_KEY", "CLIENT_EMAIL", "CLIENT_ID",
-    "AUTH_URI", "TOKEN_URI", "AUTH_PROVIDER_X509_CERT_URL",
-    "CLIENT_X509_CERT_URL", "UNIVERSE_DOMAIN"
-]
-
-# Check for missing keys
-missing_keys = [key for key in required_keys if key not in os.environ]
-if missing_keys:
-    raise ValueError(f"Missing the following environment variables: {missing_keys}")
-
-# Build credentials dict from .env values
-service_account_info = {
-    "type": "service_account",
-    "project_id": os.environ["PROJECT_ID"],
-    "private_key_id": os.environ["PRIVATE_KEY_ID"],
-    "private_key": os.environ["PRIVATE_KEY"].replace("\\n", "\n"),
-    "client_email": os.environ["CLIENT_EMAIL"],
-    "client_id": os.environ["CLIENT_ID"],
-    "auth_uri": os.environ["AUTH_URI"],
-    "token_uri": os.environ["TOKEN_URI"],
-    "auth_provider_x509_cert_url": os.environ["AUTH_PROVIDER_X509_CERT_URL"],
-    "client_x509_cert_url": os.environ["CLIENT_X509_CERT_URL"],
-    "universe_domain": os.environ["UNIVERSE_DOMAIN"]
-}
-
-# Create credentials object
-credentials = service_account.Credentials.from_service_account_info(service_account_info)
-
-# Initialize Firestore client
-db = firestore.Client(project=os.environ["PROJECT_ID"], credentials=credentials, database='activity')
 
 # Calculate current week ID like "2025-wk13"
 def get_week_id(timestamp: datetime) -> str:
@@ -136,8 +111,6 @@ def get_activity_logs(week_id):
     try:
         docs = db.collection(week_id).stream()
         logs = [doc.to_dict() for doc in docs]
-        if not logs:
-            return jsonify({"error": f"No logs available for {week_id}"}), 404
         return jsonify(logs), 200
     except Exception as e:
         print(f"Failed to fetch {week_id}'s logs: {e}")
@@ -146,7 +119,7 @@ def get_activity_logs(week_id):
 @app.route('/activity/logs', methods=['GET'])
 def get_current_week_logs():
     """
-    Returns the logs for the current (SGT) week.
+    Returns the logs for the current (UTC) week.
     """
     try:
         now = datetime.now()

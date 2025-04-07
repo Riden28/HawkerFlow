@@ -1,5 +1,4 @@
 import os
-import json
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from google.cloud import firestore
@@ -10,39 +9,15 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Retrieve individual fields from .env
-required_keys = [
-    "PROJECT_ID", "PRIVATE_KEY_ID", "PRIVATE_KEY", "CLIENT_EMAIL", "CLIENT_ID",
-    "AUTH_URI", "TOKEN_URI", "AUTH_PROVIDER_X509_CERT_URL",
-    "CLIENT_X509_CERT_URL", "UNIVERSE_DOMAIN"
-]
+# Retrieve credentials and project ID
+service_account_path = os.environ.get("FIREBASE_SERVICE_ACCOUNT_KEY_PATH")
+project_id = os.environ.get("FIREBASE_PROJECT_ID")
+if not service_account_path or not project_id:
+    raise ValueError("Required environment variables are not set.")
 
-# Check for missing keys
-missing_keys = [key for key in required_keys if key not in os.environ]
-if missing_keys:
-    raise ValueError(f"Missing the following environment variables: {missing_keys}")
-
-# Build credentials dict from .env values
-service_account_info = {
-    "type": "service_account",
-    "project_id": os.environ["PROJECT_ID"],
-    "private_key_id": os.environ["PRIVATE_KEY_ID"],
-    "private_key": os.environ["PRIVATE_KEY"].replace("\\n", "\n"),
-    "client_email": os.environ["CLIENT_EMAIL"],
-    "client_id": os.environ["CLIENT_ID"],
-    "auth_uri": os.environ["AUTH_URI"],
-    "token_uri": os.environ["TOKEN_URI"],
-    "auth_provider_x509_cert_url": os.environ["AUTH_PROVIDER_X509_CERT_URL"],
-    "client_x509_cert_url": os.environ["CLIENT_X509_CERT_URL"],
-    "universe_domain": os.environ["UNIVERSE_DOMAIN"]
-}
-
-# Create credentials object
-credentials = service_account.Credentials.from_service_account_info(service_account_info)
-
-# Initialize Firestore client
-db = firestore.Client(project=os.environ["PROJECT_ID"], credentials=credentials, database='menu')
-
+cred = service_account.Credentials.from_service_account_file(service_account_path)
+# Initialize Firestore client (remove the database parameter if not needed)
+db = firestore.Client(project=project_id, credentials=cred, database='menu')
 
 ##############################################
 # GET /hawkerCenters
