@@ -125,7 +125,7 @@ def create_order():
             if payment_resp.status_code == 200:
                 payment_result = payment_resp.json()
                 payment_data = payment_result.get("data", {})
-                payment_status = payment_data.get("status", "failed")
+                payment_status = payment_data.get("status", "success")
                 print(f"PAYMENT service responded with status code: {payment_resp.status_code}")
             else:
                 try:
