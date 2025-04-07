@@ -1,24 +1,24 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Clock, CheckCircle, XCircle, ArrowRight, ArrowLeft } from "lucide-react"
+import io from "socket.io-client"
+import { toast } from "sonner"
+import { Clock, CheckCircle, XCircle } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { Progress } from "@/components/ui/progress"
 import { Navbar } from "@/components/navbar"
-import { toast } from "sonner"
 
 interface OrderItem {
   id: string
-  name: string            // dish name
+  name: string
   price: number
   quantity: number
-  stallName?: string      // add this if you want to store stall
+  stallName?: string
   hawkerCenterName?: string
   options?: Array<{
     name: string
@@ -37,40 +37,71 @@ interface Order {
   specialInstructions?: string
   status: string
   createdAt: string
-
-  // New fields to show on the My Orders page:
   userId?: string
-  hawkerCenter?: string   // e.g. "Maxwell Food Centre"
+  hawkerCenter?: string
 }
 
 export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState("all")
   const [orders, setOrders] = useState<Order[]>([])
-  const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
+  const router = useRouter()
 
+  // Existing useEffect for retrieving orders from localStorage
   useEffect(() => {
-    // Get orders from localStorage
     const storedOrders = JSON.parse(localStorage.getItem("orders") || "[]")
     const currentOrder = JSON.parse(localStorage.getItem("currentOrder") || "{}")
-
-    // If there's a current order, add it to the list
+    
     if (currentOrder && Object.keys(currentOrder).length > 0) {
       const updatedOrders = [...storedOrders, currentOrder]
       localStorage.setItem("orders", JSON.stringify(updatedOrders))
-      localStorage.removeItem("currentOrder") // Clear the current order
+      localStorage.removeItem("currentOrder")
       setOrders(updatedOrders)
     } else {
       setOrders(storedOrders)
     }
-
+    
     setIsLoading(false)
   }, [])
 
+  // New useEffect for setting up the socket.io connection
+  useEffect(() => {
+    // Connect to the backend socket server (ensure the URL and namespace match your backend settings)
+    const socket = io("http://localhost:5000/customer_updates", {
+      transports: ["websocket"],
+    })
+
+    socket.on("connect", () => {
+      console.log("Connected to the socket server")
+      // Optionally, you can emit an event to join a specific room if needed
+      // socket.emit("join", { room: userId }) 
+    })
+
+    // Listen for the "order_ready" event from the backend
+    socket.on("order_ready", (data: { message: string }) => {
+      console.log("Order ready event received:", data)
+      // Display a notification to the user
+      toast.success(data.message)
+
+      // Optionally, update the corresponding order's status here if needed
+      // For example, if you send orderId in data, you can update that order locally:
+      // setOrders(prevOrders => prevOrders.map(order => order.id === data.orderId ? { ...order, status: "completed" } : order))
+    })
+
+    socket.on("disconnect", () => {
+      console.log("Disconnected from the socket server")
+    })
+
+    // Clean up the connection when the component unmounts
+    return () => {
+      socket.disconnect()
+    }
+  }, [])
+
+  // Function to handle order processing (unchanged)
   const handleOrderStatus = async (order: Order) => {
     try {
       console.log("Processing order:", order)
-      // Send order to backend
       const response = await fetch("/api/order-management/process-order", {
         method: "POST",
         headers: {
@@ -86,7 +117,6 @@ export default function OrdersPage() {
         throw new Error(responseData.error || "Failed to process order")
       }
 
-      // Update order status in localStorage
       const updatedOrders = orders.map((o) =>
         o.id === order.id ? { ...o, status: "processing" } : o
       )
@@ -148,95 +178,8 @@ export default function OrdersPage() {
     return <div>Loading...</div>
   }
 
+
   return (
-    // <div className="min-h-screen bg-background">
-    //   <Navbar />
-
-    //   <main className="container mx-auto px-4 py-8">
-    //     <div className="flex items-center mb-6">
-    //       <Button variant="ghost" size="sm" onClick={handleBack} className="mr-2">
-    //         <ArrowLeft className="h-4 w-4 mr-1" />
-    //         Back
-    //       </Button>
-    //       <h2 className="text-3xl font-bold">My Orders</h2>
-    //     </div>
-
-    //     <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
-    //       <TabsList>
-    //         <TabsTrigger value="all">All Orders</TabsTrigger>
-    //         <TabsTrigger value="paid">Ready for Pickup</TabsTrigger>
-    //         <TabsTrigger value="completed">Completed</TabsTrigger>
-    //         <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
-    //       </TabsList>
-
-    //       <TabsContent value={activeTab} className="mt-6">
-    //         {filteredOrders.length === 0 ? (
-    //           <Card>
-    //             <CardContent className="pt-6 text-center">
-    //               <p className="mb-4 text-muted-foreground">No orders found</p>
-    //               <Button asChild>
-    //                 <Link href="/">Order Now</Link>
-    //               </Button>
-    //             </CardContent>
-    //           </Card>
-    //         ) : (
-    //           <div className="space-y-6">
-    //             {filteredOrders.map((order, index) => (
-    //               <Card key={`order-${order.id}-${index}`}>
-    //                 <CardHeader>
-    //                   <div className="flex justify-between items-start">
-    //                     <div>
-    //                       <CardTitle>{order.id}</CardTitle>
-    //                       {/* <CardDescription>
-    //                         {new Date(order.createdAt).toLocaleString()}
-    //                       </CardDescription> */}
-    //                     </div>
-    //                     {/* Example of showing userId, hawkerCenter, etc. */}
-    //                     <div className="text-sm text-muted-foreground">
-    //                       <p>User: {order.userId}</p>
-    //                       <p>Hawker Center: {order.hawkerCenter}</p>
-    //                       {new Date(order.createdAt).toLocaleString()}
-    //                     </div>
-    //                   </div>
-    //                 </CardHeader>
-    //                 <CardContent>
-    //                   <div className="space-y-2">
-    //                     <h3 className="font-medium mb-2">Items</h3>
-    //                     {order.items.map((item, itemIndex) => (
-    //                       <div key={`item-${item.id}-${itemIndex}`}>
-    //                         <p>
-    //                           <strong>{item.id}</strong> from <em>{decodeURIComponent(item.stallName)}</em> x {item.quantity}
-    //                         </p>
-    //                         {/* If each item has item.hawkerCenterName */}
-    //                         {/* <p>Hawker Center: {item.hawkerCenterName}</p> */}
-    //                       </div>
-    //                     ))}
-
-    //                     <div className="mt-2 font-bold">Total: ${order.total.toFixed(2)}</div>
-
-    //                     {order.specialInstructions && (
-    //                       <div>
-    //                         <h4>Special Instructions</h4>
-    //                         <p>{order.specialInstructions}</p>
-    //                       </div>
-    //                     )}
-    //                   </div>
-    //                 </CardContent>
-    //               </Card>
-    //             ))}
-
-    //           </div>
-    //         )}
-    //       </TabsContent>
-    //     </Tabs>
-    //   </main>
-
-    //   <footer className="bg-muted py-6 mt-12">
-    //     <div className="container mx-auto px-4 text-center text-muted-foreground">
-    //       <p>© {new Date().getFullYear()} HawkerFlow. All rights reserved.</p>
-    //     </div>
-    //   </footer>
-    // </div>
     <div className="min-h-screen bg-background">
       <Navbar />
       <main className="container mx-auto px-4 py-8">
