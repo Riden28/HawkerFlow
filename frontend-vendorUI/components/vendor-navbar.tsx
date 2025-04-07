@@ -29,13 +29,13 @@ export function VendorNavbar() {
   }
 
   return (
-    <header className="bg-primary text-primary-foreground py-4 sticky top-0 z-50">
+    <header className="bg-blue-700 text-primary-foreground py-4 sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold flex items-center">
             <Link href="/" className="flex items-center">
               <ChefHat className="h-6 w-6 mr-2" />
-              HawkerFlow Vendor
+              <span className="text-orange-400">HawkerFlow</span> Vendor
             </Link>
           </h1>
 
