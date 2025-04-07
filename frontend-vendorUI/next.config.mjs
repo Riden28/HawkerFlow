@@ -22,6 +22,9 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  devIndicators: {
+    buildActivity: false, // hides "Compiling..." or "Rebuilding..." indicators
+  },
   experimental: {
     webpackBuildWorker: true,
     parallelServerBuildTraces: true,
