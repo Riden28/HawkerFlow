@@ -97,6 +97,40 @@ export async function getWaitTime(hawkerCenter: string, hawkerStall: string): Pr
   }
 }
 
+export async function getTotalEarned(hawkerCenter: string, hawkerStall: string): Promise<number> {
+  try {
+    // Correct the hawker center name
+    const correctedCenter = hawkerCenter.replace('Centre', 'Center')
+    
+    // Encode the parameters
+    const encodedCenter = encodeURIComponent(correctedCenter)
+    const encodedStall = encodeURIComponent(hawkerStall)
+    
+    // Construct the URL for the API call
+    const url = `${API_BASE_URL}/${encodedCenter}/${encodedStall}/totalEarned`
+    
+    console.log('Fetching total earned amount from:', url)
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+    })
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch total earned: ${response.status} ${response.statusText}`)
+    }
+    
+    const data = await response.json()
+    console.log('Total earned response:', data)  // Log the response to see what we're getting
+    return data.totalEarned || 0  // Changed from data.total to data.totalEarned
+  } catch (err) {
+    console.error('Error fetching total earned:', err)
+    return 0
+  }
+}
+
 export async function markDishComplete(
   hawkerCenter: string,
   hawkerStall: string,

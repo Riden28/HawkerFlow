@@ -19,7 +19,7 @@ import { VendorNavbar } from "@/components/vendor-navbar"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { formatTime } from "@/lib/utils"
-import { getPendingOrders, getCompletedOrders, markDishComplete, getStallsForHawkerCenter, type Order } from "@/lib/api"
+import { getPendingOrders, getCompletedOrders, markDishComplete, getStallsForHawkerCenter, type Order, getWaitTime, getTotalEarned } from "@/lib/api"
 
 // Constants for the current hawker center and stall
 const HAWKER_ARRAY = [
@@ -101,6 +101,7 @@ export default function VendorDashboard() {
   const [stallArray, setStallArray] = useState<string[]>([])
   const [selectedStall, setSelectedStall] = useState("")
   const [stallInitialized, setStallInitialized] = useState(false)
+  const [totalEarned, setTotalEarned] = useState<number>(0)
 
   useEffect(() => {
     async function fetchStalls() {
@@ -261,6 +262,25 @@ export default function VendorDashboard() {
   
   }, [selectedHawkerCenter, selectedStall, stallInitialized])
 
+  // Fetch total earned amount when stall changes or when an order is completed
+  const fetchTotalEarned = async () => {
+    try {
+      console.log('Fetching total earned amount...')
+      const earned = await getTotalEarned(selectedHawkerCenter, selectedStall)
+      console.log('Total earned amount:', earned)
+      setTotalEarned(earned)
+    } catch (err) {
+      console.error('Error fetching total earned:', err)
+    }
+  }
+
+  // Fetch total earned whenever the selected stall or hawker center changes
+  useEffect(() => {
+    if (!selectedStall || !stallInitialized) return
+    console.log('Selected stall changed, fetching new total earned amount')
+    fetchTotalEarned()
+  }, [selectedHawkerCenter, selectedStall, stallInitialized])
+
   // Filter orders based on search query
   const filteredOrders = orderData.filter((order) => {
     const matchesSearch =
@@ -273,36 +293,59 @@ export default function VendorDashboard() {
   const handleItemCompletion = async (orderId: string, itemName: string, completed: boolean) => {
     try {
       if (completed) {
+        // Store the original dish name without the quantity prefix
+        const originalDishName = itemName.split(/\d+x\s+/)[1] || itemName
+        
         console.log('Attempting to complete dish:', {
           orderId,
-          itemName,
-          originalName: itemName
+          itemName: originalDishName,
+          hawkerCenter: selectedHawkerCenter,
+          hawkerStall: selectedStall
         })
-        await markDishComplete(selectedHawkerCenter, selectedStall, orderId, itemName)
-      }
+        
+        await markDishComplete(selectedHawkerCenter, selectedStall, orderId, originalDishName)
+        
+        // Update local state only after successful API call
+        setOrderData((prevOrders) =>
+          prevOrders.map((order) => {
+            if (order.id === orderId) {
+              const updatedItems = order.items.map((item) => 
+                item.name === itemName ? { ...item, completed: true } : item
+              )
 
+              // Check if all items are completed
+              const allCompleted = updatedItems.every((item) => item.completed)
+
+              // If all items are completed, fetch the updated total earned amount
+              if (allCompleted) {
+                console.log('All items in order completed, fetching updated total earned amount')
+                fetchTotalEarned()
+              }
+
+              return {
+                ...order,
+                items: updatedItems,
+                status: allCompleted ? "completed" : "pending",
+              }
+            }
+            return order
+          }),
+        )
+      }
+    } catch (err) {
+      console.error('Failed to update item completion:', err)
+      // Uncheck the checkbox since the operation failed
       setOrderData((prevOrders) =>
         prevOrders.map((order) => {
           if (order.id === orderId) {
-            const updatedItems = order.items.map((item) =>
-              item.name === itemName ? { ...item, completed } : item
+            const updatedItems = order.items.map((item) => 
+              item.name === itemName ? { ...item, completed: false } : item
             )
-
-            // Check if all items are completed
-            const allCompleted = updatedItems.every((item) => item.completed)
-
-            return {
-              ...order,
-              items: updatedItems,
-              status: allCompleted ? "completed" : "pending",
-            }
+            return { ...order, items: updatedItems }
           }
           return order
-        }),
+        })
       )
-    } catch (err) {
-      console.error('Failed to update item completion:', err)
-      // You might want to show an error toast here
     }
   }
 
@@ -315,15 +358,24 @@ export default function VendorDashboard() {
       // Mark all items as completed
       for (const item of order.items) {
         if (!item.completed && completed) {
-          await markDishComplete(selectedHawkerCenter, selectedStall, orderId, item.name)
+          // Get the original dish name without the quantity prefix
+          const originalDishName = item.name.split(/\d+x\s+/)[1] || item.name
+          await markDishComplete(selectedHawkerCenter, selectedStall, orderId, originalDishName)
         }
       }
 
+      // Update local state only after all API calls succeed
       setOrderData((prevOrders) =>
         prevOrders.map((order) => {
           if (order.id === orderId) {
             const updatedItems = order.items.map((item) => ({ ...item, completed }))
-
+            
+            // If marking as completed, fetch the updated total earned amount
+            if (completed) {
+              console.log('Order marked as completed, fetching updated total earned amount')
+              fetchTotalEarned()
+            }
+            
             return {
               ...order,
               items: updatedItems,
@@ -335,7 +387,20 @@ export default function VendorDashboard() {
       )
     } catch (err) {
       console.error('Failed to update order completion:', err)
-      // You might want to show an error toast here
+      // Reset the order's completion state since the operation failed
+      setOrderData((prevOrders) =>
+        prevOrders.map((order) => {
+          if (order.id === orderId) {
+            const updatedItems = order.items.map((item) => ({ ...item, completed: false }))
+            return {
+              ...order,
+              items: updatedItems,
+              status: "pending",
+            }
+          }
+          return order
+        })
+      )
     }
   }
 
@@ -472,10 +537,7 @@ if (error && selectedStall) {
             <CardContent>
               <div className="text-2xl font-bold">
                 $
-                {orderData
-                  .filter((order) => order.status === "completed")
-                  .reduce((total, order) => total + order.total, 0)
-                  .toFixed(2)}
+                {totalEarned.toFixed(2)}
               </div>
               <p className="text-xs text-muted-foreground">
                 <span className="text-green-500">↑ 15%</span> from yesterday
