@@ -15,6 +15,10 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Navbar } from "@/components/navbar"
+import { io } from "socket.io-client";
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { ToastContainer } from 'react-toastify'
 
 interface HawkerCenter {
   hawkerId: string
@@ -48,6 +52,35 @@ export default function Home() {
     }
     fetchCenters()
   }, [])
+
+  // Setup the socket.io connection
+    useEffect(() => {
+      // Connect without forcing the websocket transport; let it fallback if necessary
+      const socket = io("http://localhost:5000/customer_updates", {
+        transports: ["websocket"],
+        withCredentials: false
+      })
+      
+      socket.on("connect", () => {
+        console.log("Connected to the socket server")
+        socket.emit("join_room",  { userId: 'user_Roj_order_001'})
+      })
+  
+      socket.on("order_ready", (data: { message: string }) => {
+        console.log("Order ready event received:", data)
+        toast.success(data.message)
+        // Optionally, update order status in your local state here if desired
+      })
+  
+      socket.on("disconnect", () => {
+        console.log("Disconnected from the socket server")
+      })
+  
+      // Clean up on component unmount
+      return () => {
+        socket.disconnect()
+      }
+    }, [])  
 
   if (loading) return <div>Loading hawker centers...</div>
   if (error) return <div>Error: {error}</div>
@@ -135,6 +168,7 @@ export default function Home() {
             <p>© 2025 HawkerFlow - Enterprise Solution Development G8 Team 2 </p>
           </div>
       </footer>
+      <ToastContainer position="top-right" autoClose={3000} />
     </div>
   )
 }

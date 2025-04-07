@@ -65,6 +65,7 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 def handle_join(data):
     user_id = data.get('userId')
     join_room(user_id)  # This joins the client's socket to the room
+    print(f" Joined room: {user_id}")
 
 @socketio.on('leave_room', namespace='/customer_updates')
 def handle_leave(data):
@@ -317,7 +318,7 @@ def get_pending_orders(hawkerCenter, hawkerStall):
         abort(500, description="Internal server error.")
 
 ######PATCH - Scenario 2: Mark Order as Completed######
-def build_activity_log_payload(order_data, hawkerCenter):
+def build_activity_log_payload(order_data, hawkerCenter, hawkerStall):
     activity_log = {}
 
     for dish_name, dish_info in order_data.items():
@@ -329,7 +330,7 @@ def build_activity_log_payload(order_data, hawkerCenter):
         end_time = dish_info.get("time_completed")
 
         activity_log[dish_name] = {
-            "stallName": dish_info.get("stallName"),
+            "stallName": hawkerStall,
             "quantity": dish_info.get("quantity"),
             "orderStartTime": start_time.isoformat(),
             "orderEndTime": end_time.isoformat(),
@@ -350,6 +351,7 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
 
         # Get the wait time for this dish
         userId = order_data.get("userId")
+        
         dish_data = order_data.get(dishName)
         if not dish_data:
             return {"error": "Dish not found in order"}, 404
@@ -402,15 +404,14 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
 
         time.sleep(1)
         updated_order_data = order_ref.get().to_dict()
-
         ##########################################################
         #publish order
         if is_order_completed(updated_order_data):
             
-            log_data = build_activity_log_payload(updated_order_data, hawkerCenter)
+            log_data = build_activity_log_payload(updated_order_data, hawkerCenter, hawkerStall)
             notif_data = {
                 "orderId": orderId,
-                "userId": updated_order_data.get("userId"),
+                "userId": userId,
                 "phoneNumber": updated_order_data.get("phoneNumber"),
                 "orderStatus": "completed"
             }
@@ -418,11 +419,13 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
             publish_message(f"{orderId}.log", log_data)
 
             # Emit WebSocket message to inform user to collect order
+            print("User ID to emit to:", userId)
+
             socketio.emit(
                 'order_ready',
                 {'message': f'Your order is ready for collection from {hawkerStall}!'},
                 namespace='/customer_updates',
-                room=updated_order_data.get("userId")
+                room=userId
             )
 
             return jsonify({
@@ -462,7 +465,8 @@ def delete_orders_and_reset_wait_time():
             # If there were orders, reset the estimatedWaitTime
             if has_orders:
                 document.reference.update({'estimatedWaitTime': 0})
-                print(f"Reset estimatedWaitTime to 0 for {document.id} in collection '{collection_ref.id}'")
+                document.reference.update({'totalEarned': 0})
+                print(f"Reset estimatedWaitTime & totalEarned to 0 for {document.id} in collection '{collection_ref.id}'")
             
             # Recursively process all subcollections
             subcollections = document.reference.collections()

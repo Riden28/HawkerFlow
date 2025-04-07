@@ -64,35 +64,6 @@ export default function OrdersPage() {
     setIsLoading(false)
   }, [])
 
-  // Setup the socket.io connection
-  useEffect(() => {
-    // Connect without forcing the websocket transport; let it fallback if necessary
-    const socket = io("http://localhost:5000/customer_updates", {
-      transports: ["websocket"],
-      withCredentials: false
-    })
-    // const socket = io("http://localhost:5000/customer_updates")
-    
-    socket.on("connect", () => {
-      console.log("Connected to the socket server")
-      socket.emit("join_room", 'user_Hak_order_004')
-    })
-
-    socket.on("order_ready", (data: { message: string }) => {
-      console.log("Order ready event received:", data)
-      toast.success(data.message)
-      // Optionally, update order status in your local state here if desired
-    })
-
-    socket.on("disconnect", () => {
-      console.log("Disconnected from the socket server")
-    })
-
-    // Clean up on component unmount
-    return () => {
-      socket.disconnect()
-    }
-  }, [])  
 
   // Function to handle order processing (unchanged)
   const handleOrderStatus = async (order: Order) => {
