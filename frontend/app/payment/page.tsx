@@ -208,6 +208,7 @@ export default function PaymentPage() {
           specialInstructions: "some instructions",
         };
         localStorage.setItem("currentOrder", JSON.stringify(order));
+        // localStorage.clear();
 
         clearCart()
         router.push("/orders")
