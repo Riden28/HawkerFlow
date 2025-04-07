@@ -1,7 +1,7 @@
 // Instead of calling the backend directly, we'll use Next.js proxy
 const API_BASE_URL = '/app'
 const API_BASE_URL_ORDER = '/app-order'
-// const API_BASE_URL = 'http://localhost:5000'
+// const API_BASE_URL = 'http://127:0:0:1:5000'
 // const API_BASE_URL_ORDER = 'http://localhost:5003'
 
 // Types

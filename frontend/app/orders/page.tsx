@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import io from "socket.io-client"
 import { toast } from "sonner"
-import { Clock, CheckCircle, XCircle } from "lucide-react"
+import { Clock, CheckCircle, XCircle, ArrowRight, ArrowLeft } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -64,39 +64,35 @@ export default function OrdersPage() {
     setIsLoading(false)
   }, [])
 
-  // New useEffect for setting up the socket.io connection
+  // Setup the socket.io connection
   useEffect(() => {
-    // Connect to the backend socket server (ensure the URL and namespace match your backend settings)
+    // Connect without forcing the websocket transport; let it fallback if necessary
     const socket = io("http://localhost:5000/customer_updates", {
       transports: ["websocket"],
+      withCredentials: false
     })
-
+    // const socket = io("http://localhost:5000/customer_updates")
+    
     socket.on("connect", () => {
       console.log("Connected to the socket server")
-      // Optionally, you can emit an event to join a specific room if needed
-      // socket.emit("join", { room: userId }) 
+      socket.emit("join_room", 'user_Hak_order_004')
     })
 
-    // Listen for the "order_ready" event from the backend
     socket.on("order_ready", (data: { message: string }) => {
       console.log("Order ready event received:", data)
-      // Display a notification to the user
       toast.success(data.message)
-
-      // Optionally, update the corresponding order's status here if needed
-      // For example, if you send orderId in data, you can update that order locally:
-      // setOrders(prevOrders => prevOrders.map(order => order.id === data.orderId ? { ...order, status: "completed" } : order))
+      // Optionally, update order status in your local state here if desired
     })
 
     socket.on("disconnect", () => {
       console.log("Disconnected from the socket server")
     })
 
-    // Clean up the connection when the component unmounts
+    // Clean up on component unmount
     return () => {
       socket.disconnect()
     }
-  }, [])
+  }, [])  
 
   // Function to handle order processing (unchanged)
   const handleOrderStatus = async (order: Order) => {
