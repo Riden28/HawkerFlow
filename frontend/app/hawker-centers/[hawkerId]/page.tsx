@@ -38,6 +38,30 @@ export default function HawkerCentersPage() {
   if (loading) return <div>Loading hawker centers...</div>
   if (error) return <div>Error: {error}</div>
 
+  // Helper functions (place these above your return statement)
+  function roundRating(rating: number): number {
+    return Math.round(rating * 2) / 2;
+  }
+
+  function renderStars(rating: number) {
+    const rounded = roundRating(rating);
+    const fullStars = Math.floor(rounded);
+    const halfStar = rounded % 1 !== 0;
+    const emptyStars = 5 - fullStars - (halfStar ? 1 : 0);
+
+    const stars = [];
+    for (let i = 0; i < fullStars; i++) {
+      stars.push(<BsStarFill key={`full-${i}`} className="text-yellow-500" />);
+    }
+    if (halfStar) {
+      stars.push(<BsStarHalf key="half" className="text-yellow-500" />);
+    }
+    for (let i = 0; i < emptyStars; i++) {
+      stars.push(<BsStar key={`empty-${i}`} className="text-yellow-500" />);
+    }
+    return stars;
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
