@@ -265,7 +265,7 @@ export default function VendorDashboard() {
 
   // Fetch total earned whenever the selected stall or hawker center changes
   useEffect(() => {
-    if (!selectedStall || !stallInitialized) return
+    if (!selectedStall) return
     console.log('Selected stall changed, fetching new total earned amount')
     fetchTotalEarned()
   }, [selectedHawkerCenter, selectedStall, stallInitialized])
