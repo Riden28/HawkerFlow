@@ -23,7 +23,7 @@ services:
   queuemgt:
     build:
       context: ./queuemgt
-      dockerfile: queuemanagement.Dockerfile
+      dockerfile: queueManagement.Dockerfile
     container_name: hawkerflow-queuemgt
     ports:
       - "5000:5000"
@@ -59,7 +59,7 @@ services:
   ordermgt:
     build:
       context: ./ordermgt
-      dockerfile: ordermanagement.Dockerfile
+      dockerfile: orderManagement.Dockerfile
     container_name: hawkerflow-ordermgt
     ports:
       - "5003:5003"
