@@ -108,23 +108,12 @@ export default function VendorDashboard() {
       const { stalls, defaultStall } = await populated_stallArray(selectedHawkerCenter)
       setStallArray(stalls)
       setSelectedStall(defaultStall)
-      setStallInitialized(true) // ✅ NOW safe to allow fetching
+      setStallInitialized(true)
     }
-  
+
     fetchStalls()
-    setStallInitialized(false) // Reset when hawkerCenter changes
   }, [selectedHawkerCenter])
   
-
-  useEffect(() => {
-    if (stallArray.length > 0 && !selectedStall) {
-      setSelectedStall(stallArray[0])
-    }
-  }, [stallArray, selectedStall])
-
-  useEffect(() => {
-    console.log("Updated selectedStall:", selectedStall)
-  }, [selectedStall])
 
   // Fetch orders from the API
   useEffect(() => {
@@ -153,11 +142,11 @@ export default function VendorDashboard() {
             return key !== 'userId' && key !== 'phoneNumber' && isOrderDetails(value)
           }) as [string, OrderDetails][]
 
-          // console.log('Dish entries:', dishEntries)
+          console.log('Dish entries:', dishEntries)
 
           // Get the first dish's time_started as the order time
           const firstDish = dishEntries[0]?.[1] as OrderDetails
-          console.log('First dish details:', firstDish)
+          // console.log('First dish details:', firstDish)
 
           const items = dishEntries.map(([dishName, details], itemIndex) => {
             const orderDetails = details as OrderDetails
@@ -265,9 +254,9 @@ export default function VendorDashboard() {
   // Fetch total earned amount when stall changes or when an order is completed
   const fetchTotalEarned = async () => {
     try {
-      console.log('Fetching total earned amount...')
+      // console.log('Fetching total earned amount...')
       const earned = await getTotalEarned(selectedHawkerCenter, selectedStall)
-      console.log('Total earned amount:', earned)
+      // console.log('Total earned amount:', earned)
       setTotalEarned(earned)
     } catch (err) {
       console.error('Error fetching total earned:', err)
@@ -463,7 +452,11 @@ if (error && selectedStall) {
                 {HAWKER_ARRAY.map((hawker) => (
                   <DropdownMenuItem
                     key={hawker}
-                    onClick={() => setSelectedHawkerCenter(hawker)}
+                    onClick={() => {
+                      setSelectedHawkerCenter(hawker)
+                      setStallInitialized(false)
+                    }}
+                    
                   >
                     {hawker}
                   </DropdownMenuItem>
