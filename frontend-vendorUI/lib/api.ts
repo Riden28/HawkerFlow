@@ -1,5 +1,8 @@
 // Instead of calling the backend directly, we'll use Next.js proxy
-const API_BASE_URL = '/api'
+const API_BASE_URL = '/app'
+const API_BASE_URL_ORDER = '/app-order'
+// const API_BASE_URL = 'http://localhost:5000'
+// const API_BASE_URL_ORDER = 'http://localhost:5003'
 
 // Types
 export interface OrderItem {
@@ -16,6 +19,28 @@ export interface Order {
   phoneNumber: string
   [key: string]: OrderItem | string // For dynamic dish names
 }
+//API Functions for orders
+export async function getStallsForHawkerCenter(hawkerId: string): Promise<string[]> {
+  try {
+    const encodedId = encodeURIComponent(hawkerId)
+    const response = await fetch(`${API_BASE_URL_ORDER}/hawkerCenters/${encodedId}/stalls`)
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch stalls for hawker center')
+    }
+
+    const data = await response.json()
+
+    // Map to get only the stall names
+    const stallNames = data.map((stall: any) => stall.stallName?.trim())
+
+    return stallNames
+  } catch (error) {
+    console.error('Error fetching stalls:', error)
+    throw error
+  }
+}
+
 
 // API Functions
 export async function getPendingOrders(hawkerCenter: string, hawkerStall: string): Promise<Record<string, Order>> {
@@ -70,6 +95,40 @@ export async function getWaitTime(hawkerCenter: string, hawkerStall: string): Pr
   } catch (error) {
     console.error('Error fetching wait time:', error)
     throw error
+  }
+}
+
+export async function getTotalEarned(hawkerCenter: string, hawkerStall: string): Promise<number> {
+  try {
+    // Correct the hawker center name
+    const correctedCenter = hawkerCenter.replace('Centre', 'Center')
+    
+    // Encode the parameters
+    const encodedCenter = encodeURIComponent(correctedCenter)
+    const encodedStall = encodeURIComponent(hawkerStall)
+    
+    // Construct the URL for the API call
+    const url = `${API_BASE_URL}/${encodedCenter}/${encodedStall}/totalEarned`
+    
+    console.log('Fetching total earned amount from:', url)
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+    })
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch total earned: ${response.status} ${response.statusText}`)
+    }
+    
+    const data = await response.json()
+    console.log('Total earned response:', data)  // Log the response to see what we're getting
+    return data.totalEarned || 0  // Changed from data.total to data.totalEarned
+  } catch (err) {
+    console.error('Error fetching total earned:', err)
+    return 0
   }
 }
 

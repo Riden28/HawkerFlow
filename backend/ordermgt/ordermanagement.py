@@ -4,9 +4,11 @@ import json
 import requests
 import pika
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 
 # Flask App Initialization
 app = Flask(__name__)
+CORS(app)
 
 # Environment-Based Configuration
 # Base URLs for outbound REST calls to other microservices.

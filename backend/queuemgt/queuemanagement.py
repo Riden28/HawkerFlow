@@ -7,11 +7,13 @@ from google.cloud import firestore
 from google.oauth2 import service_account
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask_socketio import SocketIO, emit
+from flask_cors import CORS
 
 # Load environment variables (if using a .env file)
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app)
 
 # Retrieve environment variables for credentials and project
 service_account_path = os.environ.get("FIREBASE_SERVICE_ACCOUNT_KEY_PATH")

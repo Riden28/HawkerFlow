@@ -30,11 +30,15 @@ const nextConfig = {
   async rewrites() {
     return [
       {
-        source: '/api/:path*',
+        source: '/app/:path*',
         destination: 'http://127.0.0.1:5000/:path*',
         basePath: false,
         locale: false
-      }
+      },
+      {
+        source: "/app-order/:path*",
+        destination: "http://127.0.0.1:5003/:path*",
+      },
     ]
   }
 }
