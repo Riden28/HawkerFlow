@@ -22,6 +22,7 @@ interface Stall {
   description: string
   rating: number
   stallPhoto?: string
+  waitTime?: number
 }
 
 export default function StallsPage() {
@@ -37,7 +38,32 @@ export default function StallsPage() {
         if (!res.ok) throw new Error(`Status ${res.status}`)
         const data = await res.json()
         if (!Array.isArray(data)) throw new Error("Response is not an array")
-        setStalls(data)
+        // For each stall, fetch its wait time from the queueMgt endpoint via the queue-proxy
+        const stallsWithWaitTimes = await Promise.all(
+          data.map(async (stall: Stall) => {
+            try {
+              const waitRes = await fetch(
+                `/api/queue-proxy/${encodeURIComponent(hawkerId)}/${encodeURIComponent(stall.stallId)}/waitTime`
+              )
+              if (waitRes.ok) {
+                const waitData = await waitRes.json()
+                // Extract the waitTime from the response JSON
+                stall.waitTime = waitData.waitTime
+              } else {
+                // Log the error response for debugging and set a fallback value
+                const errorText = await waitRes.text()
+                console.error(`Wait time fetch failed for stall ${stall.stallId}: ${errorText}`)
+                stall.waitTime = 0
+              }
+            } catch (error) {
+              console.error("Error fetching wait time:", error)
+              stall.waitTime = 0
+            }
+            return stall
+          })
+        )
+
+        setStalls(stallsWithWaitTimes)
       } catch (err: any) {
         setError(err.message)
       } finally {
@@ -47,7 +73,31 @@ export default function StallsPage() {
     fetchStalls()
   }, [hawkerId])
 
-  if (loading) return <div>Loading stalls...</div>
+  if (loading) return <div className="flex h-screen w-full items-center justify-center bg-gradient-to-r from-indigo-500 to-purple-600">
+  <div className="flex flex-col items-center">
+    <svg
+      className="animate-spin h-16 w-16 text-white"
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      ></circle>
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+      ></path>
+    </svg>
+    <p className="mt-4 text-2xl text-white">Loading, please wait...</p>
+  </div>
+</div>
   if (error) return <div>Error: {error}</div>
 
   return (
@@ -78,6 +128,14 @@ export default function StallsPage() {
               </CardHeader>
               <CardContent>
                 <p>{stall.description}</p>
+                {/* Added wait time display snippet */}
+                {stall.waitTime !== null ? (
+                  <p className="mt-2 text-sm text-gray-700">
+                    Estimated Wait Time: {stall.waitTime} min
+                  </p>
+                ) : (
+                  <p className="mt-2 text-sm text-gray-700">Estimated Wait Time: N/A</p>
+                )}
               </CardContent>
               <CardFooter>
                 <Button asChild>
