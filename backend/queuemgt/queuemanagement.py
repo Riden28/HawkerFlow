@@ -32,7 +32,7 @@ RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST")
 print("RABBITMQ_HOST:", RABBITMQ_HOST)
 EXCHANGE_NAME = 'queue_exchange'
 QUEUE_NAME = 'O_queue'
-connection = pika.BlockingConnection(pika.ConnectionParameters(hsot=RABBITMQ_HOST, heartbeat=10000))
+connection = pika.BlockingConnection(pika.ConnectionParameters(host=RABBITMQ_HOST, heartbeat=10000))
 channel = connection.channel()
 ###############################################################################
 #Web Sockets!!!
