@@ -6,7 +6,7 @@ from flask import Flask, jsonify, abort
 from google.cloud import firestore
 from google.oauth2 import service_account
 from apscheduler.schedulers.background import BackgroundScheduler
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO, emit, join_room, leave_room
 from flask_cors import CORS
 
 # Load environment variables (if using a .env file)
@@ -32,12 +32,27 @@ RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST")
 print("RABBITMQ_HOST:", RABBITMQ_HOST)
 EXCHANGE_NAME = 'queue_exchange'
 QUEUE_NAME = 'O_queue'
-connection = pika.BlockingConnection(pika.ConnectionParameters(RABBITMQ_HOST))
+connection = pika.BlockingConnection(pika.ConnectionParameters(hsot=RABBITMQ_HOST, heartbeat=10000))
 channel = connection.channel()
 ###############################################################################
 #Web Sockets!!!
 ###############################################################################
 socketio = SocketIO(app, cors_allowed_origins="*")
+
+@socketio.on('join_room', namespace='/customer_updates')
+def handle_join(data):
+    user_id = data.get('userId')
+    join_room(user_id)  # This joins the client's socket to the room
+
+@socketio.on('leave_room', namespace='/customer_updates')
+def handle_leave(data):
+    user_id = data.get('userId')
+    if user_id:
+        leave_room(user_id)
+        print(f"User left room: {user_id}")
+
+# socket.emit('leave_room', { userId: 'abc123' });
+# socket.emit('join_room', { userId: 'abc123' });
 
 ###############################################################################
 #Consume from RabbitMQ
@@ -383,9 +398,9 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
             # Emit WebSocket message to inform user to collect order
             socketio.emit(
                 'order_ready',
-                {'message': f'Your {dishName} order is ready for collection from {hawkerStall}!'},
+                {'message': f'Your order is ready for collection from {hawkerStall}!'},
                 namespace='/customer_updates',
-                room=userId
+                room=updated_order_data.get("userId")
             )
 
             return jsonify({
