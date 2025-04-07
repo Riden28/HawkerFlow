@@ -1,17 +1,16 @@
 # Use a lightweight base Python image
 FROM python:3.12-slim
 
-# Set a working directory
+# Set the working directory
 WORKDIR /app
 
-# Copy in the requirements and install them
+# Copy in the requirements file and install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy notification script into the container
+# Copy the notification consumer script into the container
 COPY notification.py .
 
-# By default, this service runs as a RabbitMQ consumer, so there's no need to EXPOSE a port
-
+# Since this service runs as a RabbitMQ consumer, no port is exposed
 # Set the default command to run the notification consumer
 CMD ["python", "notification.py"]

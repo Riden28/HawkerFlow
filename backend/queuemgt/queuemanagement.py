@@ -74,6 +74,10 @@ def handle_leave(data):
         leave_room(user_id)
         print(f"User left room: {user_id}")
 
+@app.route('/test', methods=['GET'])
+def test_route():
+    return jsonify({"status": "queue is working"})
+
 # socket.emit('leave_room', { userId: 'abc123' });
 # socket.emit('join_room', { userId: 'abc123' });
 
@@ -483,11 +487,24 @@ scheduler = BackgroundScheduler()
 scheduler.add_job(delete_orders_and_reset_wait_time, 'cron', hour=3, minute=0, second=0, timezone=pytz.timezone('Asia/Singapore'))
 scheduler.start()
 
-if __name__ == '__main__':
-    if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
-        threading.Thread(target=start_rabbitmq_consumer, daemon=True).start()
+def safe_start():
+    try:
+        setup_rabbitmq_connection()
+        if channel:
+            start_rabbitmq_consumer()
+        else:
+            print("❌ Channel not initialized. Skipping consumer startup.")
+    except Exception as e:
+        print(f"🔥 RabbitMQ consumer crashed: {e}")
 
-    app.run(debug=True, port=5000, use_reloader=False)
+if __name__ == '__main__':
+    threading.Thread(target=safe_start, daemon=True).start()
+    app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False, allow_unsafe_werkzeug=True)
+
+
+
+
+
 
 
 # orderDetails ={

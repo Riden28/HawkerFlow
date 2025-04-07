@@ -11,8 +11,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy your order management script
 COPY ordermanagement.py .
 
-# Expose the port Flask app is running on (for documentation)
+# Expose the port your Flask app runs on (for documentation)
 EXPOSE 5003
 
-# Define the default command to run service
-CMD ["python", "ordermanagement.py"]
+# Run the application using Gunicorn
+CMD ["gunicorn", "-b", "0.0.0.0:5003", "ordermanagement:app"]

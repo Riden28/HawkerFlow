@@ -10,11 +10,19 @@ services:
       RABBITMQ_DEFAULT_PASS: guest
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - hawker-network
+    command: >
+      bash -c "chown -R rabbitmq:rabbitmq /var/lib/rabbitmq &&
+               while [ ! -f /var/lib/rabbitmq/.erlang.cookie ]; do sleep 1; done &&
+               chmod 400 /var/lib/rabbitmq/.erlang.cookie &&
+               exec docker-entrypoint.sh rabbitmq-server"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 5s
       timeout: 10s
       retries: 10
+
 
   setup_rabbitmq:
     build:
@@ -23,6 +31,8 @@ services:
     container_name: hawkerflow-setup_rabbitmq
     depends_on:
       - rabbitmq
+    networks:
+      - hawker-network
     env_file:
       - .env
     restart: on-failure
@@ -43,6 +53,8 @@ services:
         condition: service_healthy
     environment:
       - RABBITMQ_HOST=rabbitmq
+    networks:
+      - hawker-network
 
   menu:
     build:
@@ -53,6 +65,8 @@ services:
       - "5001:5001"
     env_file:
       - .env
+    networks:
+      - hawker-network
     volumes:
       - ./hawkerflow-is213-firebase-adminsdk-fbsvc-5225881c2e.json:/app/firebase-cred.json
 
@@ -65,6 +79,8 @@ services:
       - "5002:5002"
     env_file:
       - .env
+    networks:
+      - hawker-network
     volumes:
       - ./hawkerflow-is213-firebase-adminsdk-fbsvc-5225881c2e.json:/app/firebase-cred.json
 
@@ -79,6 +95,8 @@ services:
       - setup_rabbitmq
     env_file:
       - .env
+    networks:
+      - hawker-network
     environment:
       - RABBITMQ_HOST=rabbitmq
       - MENU_SERVICE_URL=http://hawkerflow-menu:5001
@@ -97,6 +115,8 @@ services:
       - setup_rabbitmq
     env_file:
       - .env
+    networks:
+      - hawker-network
     volumes:
       - ./hawkerflow-is213-firebase-adminsdk-fbsvc-5225881c2e.json:/app/firebase-cred.json
     environment:
@@ -107,7 +127,7 @@ services:
     container_name: kong
     restart: always
     networks:
-      - default
+      - hawker-network
     volumes:
       - ./kong/kong.yml:/usr/local/kong/declarative/kong.yml
     environment:
@@ -128,5 +148,5 @@ volumes:
   rabbitmq-data:
 
 networks:
-  default:
-    name: hawker-network
+  hawker-network:
+    external: true

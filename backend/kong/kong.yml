@@ -9,22 +9,32 @@ services:
       - name: customer-order-routes
         paths:
           - /hawkerCenters
+          - "~^/hawkerCenters/[^/]+/stalls$"
+          - "~^/hawkerCenters/[^/]+/stalls/[^/]+/dishes$"
           - /order
+          - "~^/order/status/[^/]+$"
+        strip_path: false
 
   - name: queuemgt-public
     url: http://hawkerflow-queuemgt:5000
     routes:
-      - name: customer-queue-waittime
+      - name: customer-queue-routes
         paths:
-          - /waitTime
+          - "~^/[^/]+/[^/]+/waitTime$"
+        strip_path: false
 
-  # =============== HAWKER UI (Catch-All) ===============
+  # =============== HAWKER UI (Auth Protected) ===============
   - name: queuemgt-protected
     url: http://hawkerflow-queuemgt:5000
     routes:
-      - name: hawker-queue-all
+      - name: hawker-queue-routes
         paths:
-          - /  # catch all routes to this service
+          - "~^/[^/]+/[^/]+/totalEarned$"
+          - "~^/[^/]+/[^/]+/orders$"
+          - "~^/[^/]+/[^/]+/completed_orders$"
+          - "~^/[^/]+/[^/]+/pending_orders$"
+          - "~^/[^/]+/[^/]+/orders/[^/]+/[^/]+/complete$"
+        strip_path: false
         plugins:
           - name: key-auth
           - name: acl
@@ -35,9 +45,10 @@ services:
   - name: ordermgt-protected
     url: http://hawkerflow-ordermgt:5003
     routes:
-      - name: hawker-order-all
+      - name: hawker-order-routes
         paths:
-          - /  # catch all to ordermgt, auth protected
+          - /hawker-only-example  # Placeholder
+        strip_path: false
         plugins:
           - name: key-auth
           - name: acl
@@ -48,7 +59,3 @@ services:
 consumers:
   - username: hawker-ui
     custom_id: hawker-001
-    keyauth_credentials:
-      - key: hawker-api-key-123
-    acls:
-      - group: hawker-group
