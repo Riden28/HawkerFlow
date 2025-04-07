@@ -108,7 +108,7 @@ export default function VendorDashboard() {
       const { stalls, defaultStall } = await populated_stallArray(selectedHawkerCenter)
       setStallArray(stalls)
       setSelectedStall(defaultStall)
-      setStallInitialized(true)
+      setStallInitialized((prev) => (prev ? prev : true))
     }
 
     fetchStalls()
@@ -142,7 +142,7 @@ export default function VendorDashboard() {
             return key !== 'userId' && key !== 'phoneNumber' && isOrderDetails(value)
           }) as [string, OrderDetails][]
 
-          console.log('Dish entries:', dishEntries)
+          // console.log('Dish entries:', dishEntries)
 
           // Get the first dish's time_started as the order time
           const firstDish = dishEntries[0]?.[1] as OrderDetails
@@ -248,8 +248,7 @@ export default function VendorDashboard() {
     fetchOrders()
     const interval = setInterval(fetchOrders, 10000)
     return () => clearInterval(interval)
-  
-  }, [selectedHawkerCenter, selectedStall, stallInitialized])
+  }, [selectedHawkerCenter && selectedStall && stallInitialized])
 
   // Fetch total earned amount when stall changes or when an order is completed
   const fetchTotalEarned = async () => {
@@ -265,11 +264,17 @@ export default function VendorDashboard() {
 
   // Fetch total earned whenever the selected stall or hawker center changes
   useEffect(() => {
-    if (!selectedStall) return
-    console.log('Selected stall changed, fetching new total earned amount')
+    if (!selectedStall || !stallInitialized) return
+    // console.log('Selected stall changed, fetching new total earned amount')
+    
     fetchTotalEarned()
   }, [selectedHawkerCenter, selectedStall, stallInitialized])
 
+  useEffect(() => {
+    console.log("🐛 Order fetch triggered", { selectedHawkerCenter, selectedStall, stallInitialized })
+  }, [selectedHawkerCenter && selectedStall && stallInitialized]
+  )
+  
   // Filter orders based on search query
   const filteredOrders = orderData.filter((order) => {
     const matchesSearch =
@@ -533,7 +538,7 @@ if (error && selectedStall) {
                 {totalEarned.toFixed(2)}
               </div>
               <p className="text-xs text-muted-foreground">
-                <span className="text-green-500">↑ 15%</span> from yesterday
+                Updated Daily
               </p>
             </CardContent>
           </Card>
