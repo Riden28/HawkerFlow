@@ -4,7 +4,8 @@ amqp_host = os.environ.get("RABBITMQ_HOST", "rabbitmq")
 amqp_port = 5672
 order_exchange_name = "order_exchange"
 queue_exchange_name = "queue_exchange"
-exchange_type = "topic"
+order_exchange_type = "topic"
+queue_exchange_type = "fanout"
 
 def wait_for_rabbitmq(host, port, retries=10):
     for i in range(retries):
@@ -62,7 +63,7 @@ queue_channel = create_exchange(
     hostname=amqp_host,
     port=amqp_port,
     exchange_name=queue_exchange_name, #queue_exchange
-    exchange_type=exchange_type,
+    exchange_type=queue_exchange_type,
 )
 
 create_queue(
@@ -85,7 +86,7 @@ order_channel = create_exchange(
     hostname=amqp_host,
     port=amqp_port,
     exchange_name=order_exchange_name, #order_exchange
-    exchange_type=exchange_type,
+    exchange_type=queue_exchange_type,
 )
 
 create_queue(
