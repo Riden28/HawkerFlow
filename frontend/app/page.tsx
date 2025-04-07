@@ -59,7 +59,7 @@ export default function Home() {
         <section className="mb-12">
           <div className="text-center mb-8">
             <h2 className="text-4xl font-bold mb-4">Find Your Hawker Centre</h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-xl text-muted-foreground mx-auto">
               Browse hawker centres, check waiting times, and order food without the wait.
             </p>
           </div>
@@ -103,12 +103,18 @@ export default function Home() {
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div className="flex items-center">
                       <Badge variant="outline" className="mr-2">
-                        {center.stallCount} Stalls
+                        Halal
+                      </Badge>
+                      <Badge variant="outline" className="mr-2">
+                        Chinese
+                      </Badge>
+                      <Badge variant="outline" className="mr-2">
+                        Vegetarian
                       </Badge>
                     </div>
                     <div className="flex items-center justify-end text-muted-foreground">
                       <Clock className="h-3 w-3 mr-1" />
-                      {center.openingHours}
+                      5am - 8pm
                     </div>
                   </div>
                 </CardContent>
@@ -125,11 +131,9 @@ export default function Home() {
         </section>
       </main>
       <footer className="bg-muted py-12">
-        <div className="container mx-auto px-4">
-          <div className="border-t border-border mt-8 pt-8 text-center text-muted-foreground">
-            <p>© {new Date().getFullYear()} HawkerFlow. All rights reserved.</p>
+          <div className="text-center text-muted-foreground">
+            <p>© 2025 HawkerFlow - Enterprise Solution Development G8 Team 2 </p>
           </div>
-        </div>
       </footer>
     </div>
   )

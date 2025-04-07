@@ -105,7 +105,7 @@ export default function CartPage() {
                           />
                           <div className="flex-1">
                             <h3 className="font-medium">{item.name}</h3>
-                            <p className="text-sm text-muted-foreground">{decodeURIComponent(item.stallName)}</p>
+                            <p className="text-lg"><b>{decodeURIComponent(item.stallName)}</b></p>
                             <p className="text-xs text-muted-foreground">{item.hawkerCenterName}</p>
                             {item.options && item.options.length > 0 && (
                               <div className="mt-1">
@@ -207,14 +207,16 @@ export default function CartPage() {
                   </div>
 
                   <div className="mt-6 p-4 bg-muted rounded-lg">
-                    <h3 className="font-medium mb-2">Estimated Wait Time</h3>
+                    <h3 className="font-medium mb-2"><b>Total Wait Time</b></h3>
                     {cart.items.length > 0 ? (
                       <>
                         <p className="text-sm mb-2">
-                          Your order includes items from {stallCount} stall(s). The total estimated time is based on the
-                          longest wait:
+                          Your order includes items from {stallCount} stall(s). The total estimated time is the sum of wait times for all dishes:
                         </p>
-                        <div className="font-bold">{maxWaitTime.minutes} minutes total</div>
+                        <div className="font-bold">
+                          {cart.items.reduce((total, item) => total + (parseInt(item.waitTime) || 0), 0)} minutes total
+                        </div>
+
                         <p className="text-xs text-muted-foreground">
                           (Includes queue waiting time and food preparation)
                         </p>
@@ -225,8 +227,8 @@ export default function CartPage() {
                   </div>
                 </CardContent>
                 <CardFooter>
-                  <Button 
-                    className="w-full" 
+                  <Button
+                    className="w-full"
                     onClick={handleProceedToPayment}
                     disabled={cart.items.length === 0 || isProcessing}
                   >
