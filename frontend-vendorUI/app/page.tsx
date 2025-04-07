@@ -246,9 +246,10 @@ export default function VendorDashboard() {
     }
   
     fetchOrders()
-    const interval = setInterval(fetchOrders, 10000)
-    return () => clearInterval(interval)
-  }, [selectedHawkerCenter && selectedStall && stallInitialized])
+    // const interval = setInterval(fetchOrders, 10000)
+    // return () => clearInterval(interval)
+    // this was causing the Fast Refresh
+  }, [selectedHawkerCenter , selectedStall , stallInitialized])
 
   // Fetch total earned amount when stall changes or when an order is completed
   const fetchTotalEarned = async () => {
@@ -272,7 +273,7 @@ export default function VendorDashboard() {
 
   useEffect(() => {
     console.log("🐛 Order fetch triggered", { selectedHawkerCenter, selectedStall, stallInitialized })
-  }, [selectedHawkerCenter && selectedStall && stallInitialized]
+  }, [selectedHawkerCenter, selectedStall, stallInitialized]
   )
   
   // Filter orders based on search query
