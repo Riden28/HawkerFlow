@@ -15,25 +15,32 @@ import { toast } from "sonner"
 
 interface OrderItem {
   id: string
-  name: string
+  name: string            // dish name
   price: number
   quantity: number
+  stallName?: string      // add this if you want to store stall
+  hawkerCenterName?: string
   options?: Array<{
     name: string
     price: number
   }>
+  specialInstructions?: string
 }
 
 interface Order {
   id: string
   items: OrderItem[]
   total: number
-  email: string
-  paymentMethod: string
+  email?: string
+  paymentMethod?: string
   cardToken?: string
   specialInstructions?: string
   status: string
   createdAt: string
+
+  // New fields to show on the My Orders page:
+  userId?: string
+  hawkerCenter?: string   // e.g. "Maxwell Food Centre"
 }
 
 export default function OrdersPage() {
@@ -133,8 +140,8 @@ export default function OrdersPage() {
     router.back()
   }
 
-  const filteredOrders = activeTab === "all" 
-    ? orders 
+  const filteredOrders = activeTab === "all"
+    ? orders
     : orders.filter((order) => order.status.toLowerCase() === activeTab)
 
   if (isLoading) {
@@ -142,9 +149,96 @@ export default function OrdersPage() {
   }
 
   return (
+    // <div className="min-h-screen bg-background">
+    //   <Navbar />
+
+    //   <main className="container mx-auto px-4 py-8">
+    //     <div className="flex items-center mb-6">
+    //       <Button variant="ghost" size="sm" onClick={handleBack} className="mr-2">
+    //         <ArrowLeft className="h-4 w-4 mr-1" />
+    //         Back
+    //       </Button>
+    //       <h2 className="text-3xl font-bold">My Orders</h2>
+    //     </div>
+
+    //     <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
+    //       <TabsList>
+    //         <TabsTrigger value="all">All Orders</TabsTrigger>
+    //         <TabsTrigger value="paid">Ready for Pickup</TabsTrigger>
+    //         <TabsTrigger value="completed">Completed</TabsTrigger>
+    //         <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
+    //       </TabsList>
+
+    //       <TabsContent value={activeTab} className="mt-6">
+    //         {filteredOrders.length === 0 ? (
+    //           <Card>
+    //             <CardContent className="pt-6 text-center">
+    //               <p className="mb-4 text-muted-foreground">No orders found</p>
+    //               <Button asChild>
+    //                 <Link href="/">Order Now</Link>
+    //               </Button>
+    //             </CardContent>
+    //           </Card>
+    //         ) : (
+    //           <div className="space-y-6">
+    //             {filteredOrders.map((order, index) => (
+    //               <Card key={`order-${order.id}-${index}`}>
+    //                 <CardHeader>
+    //                   <div className="flex justify-between items-start">
+    //                     <div>
+    //                       <CardTitle>{order.id}</CardTitle>
+    //                       {/* <CardDescription>
+    //                         {new Date(order.createdAt).toLocaleString()}
+    //                       </CardDescription> */}
+    //                     </div>
+    //                     {/* Example of showing userId, hawkerCenter, etc. */}
+    //                     <div className="text-sm text-muted-foreground">
+    //                       <p>User: {order.userId}</p>
+    //                       <p>Hawker Center: {order.hawkerCenter}</p>
+    //                       {new Date(order.createdAt).toLocaleString()}
+    //                     </div>
+    //                   </div>
+    //                 </CardHeader>
+    //                 <CardContent>
+    //                   <div className="space-y-2">
+    //                     <h3 className="font-medium mb-2">Items</h3>
+    //                     {order.items.map((item, itemIndex) => (
+    //                       <div key={`item-${item.id}-${itemIndex}`}>
+    //                         <p>
+    //                           <strong>{item.id}</strong> from <em>{decodeURIComponent(item.stallName)}</em> x {item.quantity}
+    //                         </p>
+    //                         {/* If each item has item.hawkerCenterName */}
+    //                         {/* <p>Hawker Center: {item.hawkerCenterName}</p> */}
+    //                       </div>
+    //                     ))}
+
+    //                     <div className="mt-2 font-bold">Total: ${order.total.toFixed(2)}</div>
+
+    //                     {order.specialInstructions && (
+    //                       <div>
+    //                         <h4>Special Instructions</h4>
+    //                         <p>{order.specialInstructions}</p>
+    //                       </div>
+    //                     )}
+    //                   </div>
+    //                 </CardContent>
+    //               </Card>
+    //             ))}
+
+    //           </div>
+    //         )}
+    //       </TabsContent>
+    //     </Tabs>
+    //   </main>
+
+    //   <footer className="bg-muted py-6 mt-12">
+    //     <div className="container mx-auto px-4 text-center text-muted-foreground">
+    //       <p>© {new Date().getFullYear()} HawkerFlow. All rights reserved.</p>
+    //     </div>
+    //   </footer>
+    // </div>
     <div className="min-h-screen bg-background">
       <Navbar />
-
       <main className="container mx-auto px-4 py-8">
         <div className="flex items-center mb-6">
           <Button variant="ghost" size="sm" onClick={handleBack} className="mr-2">
@@ -174,61 +268,80 @@ export default function OrdersPage() {
               </Card>
             ) : (
               <div className="space-y-6">
-                {filteredOrders.map((order, index) => (
-                  <Card key={`order-${order.id}-${index}`}>
-                    <CardHeader>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle>Order #{order.id}</CardTitle>
-                          <CardDescription>
-                            {new Date(order.createdAt).toLocaleString()}
-                          </CardDescription>
+                {filteredOrders.map((order, index) => {
+                  // Group items by stall name
+                  const groupedItemsByStall = order.items.reduce((acc, item) => {
+                    const stall = decodeURIComponent(item.stallName ?? "Unknown Stall")
+                    if (!acc[stall]) {
+                      acc[stall] = []
+                    }
+                    acc[stall].push(item)
+                    return acc
+                  }, {} as Record<string, OrderItem[]>)
+
+                  return (
+                    <Card key={`order-${order.id}-${index}`} className="shadow-lg rounded-lg">
+                      <CardHeader className="p-4 border-b">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            {/* Order ID in a bold, larger font */}
+                            <CardTitle className="text-xl font-bold text-gray-800">
+                              {order.id}
+                            </CardTitle>
+                            <CardDescription className="text-sm text-gray-500">
+                              Placed on: {new Date(order.createdAt).toLocaleString()}
+                            </CardDescription>
+                          </div>
+                          <div className="text-right text-sm text-gray-500">
+                            <p className="font-medium">User: {order.userId}</p>
+                            <p className="font-medium">Hawker Center: {order.hawkerCenter}</p>
+                          </div>
                         </div>
-                        {getStatusBadge(order.status)}
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div>
-                          <h3 className="font-medium mb-2">Items</h3>
-                          {order.items.map((item, itemIndex) => (
-                            <div key={`item-${order.id}-${item.id}-${itemIndex}`} className="flex justify-between py-1">
-                              <div>
-                                <p>{item.name} x {item.quantity}</p>
-                                {item.options && item.options.length > 0 && (
-                                  <div className="text-sm text-muted-foreground">
-                                    {item.options.map((option, optionIndex) => (
-                                      <p key={`option-${order.id}-${item.id}-${option.name}-${optionIndex}`}>
-                                        {option.name} (+${option.price.toFixed(2)})
-                                      </p>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                              <p className="font-medium">
-                                ${((item.price + (item.options?.reduce((sum, opt) => sum + opt.price, 0) || 0)) * item.quantity).toFixed(2)}
-                              </p>
+                      </CardHeader>
+                      <CardContent className="p-4">
+                        {/* Grouped items by stall */}
+                        <div className="space-y-6">
+                          {Object.entries(groupedItemsByStall).map(([stall, items]) => (
+                            <div key={stall} className="bg-gray-50 p-3 rounded-lg">
+                              <h3 className="text-lg font-semibold text-primary mb-2">
+                                {stall}
+                              </h3>
+                              {items.map((item) => (
+                                <div
+                                  key={item.id}
+                                  className="flex justify-between items-center py-1"
+                                >
+                                  <span className="font-medium text-gray-700">
+                                    {item.id} (x{item.quantity})
+                                  </span>
+                                  {/* If you also want to show price per item, uncomment below */}
+                                  {/* <span className="text-gray-600">
+                                    ${item.price.toFixed(2)}
+                                  </span> */}
+                                </div>
+                              ))}
                             </div>
                           ))}
                         </div>
 
-                        <Separator />
-
-                        <div className="flex justify-between">
-                          <span className="font-bold">Total</span>
-                          <span className="font-bold">${order.total.toFixed(2)}</span>
+                        {/* Total */}
+                        <div className="mt-4 text-xl font-bold text-gray-800">
+                          Total: ${order.total.toFixed(2)}
                         </div>
 
+                        {/* Special Instructions */}
                         {order.specialInstructions && (
-                          <div>
-                            <h3 className="font-medium mb-1">Special Instructions</h3>
-                            <p className="text-muted-foreground">{order.specialInstructions}</p>
+                          <div className="mt-4">
+                            <h4 className="font-medium text-gray-700">Special Instructions</h4>
+                            <p className="italic text-gray-600">
+                              {order.specialInstructions}
+                            </p>
                           </div>
                         )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  )
+                })}
               </div>
             )}
           </TabsContent>

@@ -105,7 +105,7 @@ export default function CartPage() {
                           />
                           <div className="flex-1">
                             <h3 className="font-medium">{item.name}</h3>
-                            <p className="text-sm text-muted-foreground">{item.stallName}</p>
+                            <p className="text-sm text-muted-foreground">{decodeURIComponent(item.stallName)}</p>
                             <p className="text-xs text-muted-foreground">{item.hawkerCenterName}</p>
                             {item.options && item.options.length > 0 && (
                               <div className="mt-1">
@@ -152,8 +152,7 @@ export default function CartPage() {
                         </div>
                         <div className="ml-20 mt-1 mb-2">
                           <div className="flex items-center text-xs text-muted-foreground">
-                            <span className="mr-4">Wait time: {item.waitTime}</span>
-                            <span>Prep time: {item.prepTime}</span>
+                            <span className="mr-4">Wait time: {item.waitTime} mins</span>
                           </div>
                         </div>
                         <Separator className="my-2" />
