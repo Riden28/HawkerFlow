@@ -187,7 +187,7 @@ export default function VendorDashboard() {
             status: "pending" as const,
             total: calculatedTotal,
             items,
-            paymentMethod: "Not specified",
+            paymentMethod: "",
             orderNumber: index + 1,
           }
         })
@@ -231,7 +231,7 @@ export default function VendorDashboard() {
               return sum + (price * quantity)
             }, 0),
             items,
-            paymentMethod: "Not specified",
+            paymentMethod: "",
             orderNumber: processedPendingOrders.length + index + 1,
           }
         })
