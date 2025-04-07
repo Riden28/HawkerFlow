@@ -1,5 +1,5 @@
 import os
-import datetime
+import random
 from dotenv import load_dotenv
 from flask import Flask
 from google.cloud import firestore
@@ -20,50 +20,59 @@ if not service_account_path or not project_id:
 cred = service_account.Credentials.from_service_account_file(service_account_path)
 db = firestore.Client(project=project_id, credentials=cred, database='queue')
 
-import os, random
-from google.cloud import firestore
-from google.oauth2 import service_account
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
-service_account_path = os.environ.get("FIREBASE_SERVICE_ACCOUNT_KEY_PATH")
-project_id = os.environ.get("FIREBASE_PROJECT_ID")
-
-cred = service_account.Credentials.from_service_account_file(service_account_path)
-db = firestore.Client(project=project_id, credentials=cred, database='queue')
-
-# 🔖 Configuration
-hawker_centres = [
-    "Bukit Timah",
-    "Lagoon Hawker Center",
-    "Maxwell Food Center"
-]
-
-stalls = {
-    "Tian Tian Chicken Rice": ["Chicken Rice", "Roasted Chicken", "Egg", "Cucumber"],
-    "Ah Heng Curry Chicken Bee Hoon Mee": ["Fishball Noodles", "Laksa", "Wanton Mee"]
+# 💡 Final structure: each hawker center is a collection, each stall is a document
+hawker_data = {
+    "Maxwell Food Center": [
+        "Ah Heng Curry Chicken Bee Hoon Mee",
+        "Danlao",
+        "Fuzhou Oyster Cake",
+        "Tian Tian Chicken Rice",
+        "Zhong Guo La Mian Xiao Long Bao"
+    ],
+    "Old Airport Road Food Center": [
+        "Jin Hua Fish Head Bee Hoon",
+        "Old Nyonya",
+        "Rojak, Popiah & Cockle",
+        "Tong Fong Fatt Hainanese Boneless Chicken Rice",
+        "Ye Lai Xiang Tasty Barbecue"
+    ],
+    "Lau Pa Sat": [
+        "545 Whampoa Prawn Noodles",
+        "AR Rahman Cafe & Royal Prata",
+        "Allauddin's Briyani",
+        "Lian He Ben Ji Claypot Rice",
+        "Monan Pork Soup"
+    ],
+    "Chinatown Complex Food Center": [
+        "Hakka HamCha & Yong Tou Fu",
+        "Heng Ji Chicken Rice",
+        "Hill Street Fried Kway Teow",
+        "Hong Kong Mong Kok Tim Sum",
+        "Zhu Zhu Zai"
+    ]
 }
 
-# 🔁 Create each hawker centre with 2 stalls and 4 orders each
-for centre in hawker_centres:
-    print(f"\n🏢 Setting up Hawker Centre: {centre}")
+# 🍜 Sample dishes
+menu = ["Laksa", "Char Kway Teow", "Mee Rebus", "Chicken Rice", "Popiah", "Oyster Cake", "Claypot Rice"]
 
-    for stall_name, dishes in stalls.items():
+# 🧠 Seeding logic
+for center_name, stalls in hawker_data.items():
+    print(f"\n🏢 Seeding Hawker Center: {center_name}")
+
+    for stall_name in stalls:
         print(f"  🍽️ Stall: {stall_name}")
 
-        # Create or reset stall doc
-        stall_ref = db.collection(centre).document(stall_name)
-        stall_ref.set({"estimatedWaitTime": 0})
+        # Each hawker center is a collection; each stall is a document
+        stall_ref = db.collection(center_name).document(stall_name)
+        stall_ref.set({
+            "estimatedWaitTime": 0,
+            "totalEarned": 0
+        })
 
-        stall_total_wait = 0
-        order_counter = 1  # Reset per stall
+        total_wait_time = 0
 
-        for _ in range(4):  # 4 orders
-            order_id = f"order_{order_counter:03d}"
-            order_counter += 1
-
-            # 🔁 Subcollection is now 'orders' (plural)
+        for i in range(4):  # Generate 4 orders
+            order_id = f"order_{i+1:03d}"
             order_ref = stall_ref.collection("orders").document(order_id)
 
             order_data = {
@@ -71,15 +80,12 @@ for centre in hawker_centres:
                 "phoneNumber": f"9123{random.randint(1000,9999)}"
             }
 
-            selected_dishes = random.sample(dishes, 2)
-
+            selected_dishes = random.sample(menu, 2)
             for dish in selected_dishes:
                 quantity = random.randint(1, 3)
                 wait_time = random.randint(5, 10)
-                price = random.randint(1, 5)
-                total_dish_wait = wait_time * quantity
-
-                stall_total_wait += total_dish_wait
+                price = random.randint(3, 7)
+                total_wait_time += quantity * wait_time
 
                 order_data[dish] = {
                     "completed": False,
@@ -93,9 +99,7 @@ for centre in hawker_centres:
             order_ref.set(order_data)
             print(f"    ✅ Created {order_id} with dishes: {selected_dishes}")
 
-        # Update accurate total wait time
-        stall_ref.update({"estimatedWaitTime": stall_total_wait})
-        stall_ref.update({"totalEarned": 0})
-        print(f"  ⏳ Estimated wait time set: {stall_total_wait} mins")
+        stall_ref.update({"estimatedWaitTime": total_wait_time})
+        print(f"  ⏳ Set estimated wait time: {total_wait_time} mins")
 
-print("\n🎉 All hawker centres seeded successfully with clean order IDs and 'orders' subcollections!")
+print("\n🎉 All hawker centers and stalls seeded successfully in flattened structure!")

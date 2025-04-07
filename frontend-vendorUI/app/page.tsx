@@ -77,6 +77,21 @@ function isOrderDetails(value: unknown): value is OrderDetails {
   )
 }
 
+async function populated_stallArray(hawkerCenter: string): Promise<{
+  stalls: string[]
+  defaultStall: string
+}> {
+  try {
+    const stalls = await getStallsForHawkerCenter(hawkerCenter)
+    const defaultStall = stalls.length > 0 ? stalls[0] : ""
+    return { stalls, defaultStall }
+  } catch (error) {
+    console.error("Failed to fetch stalls:", error)
+    return { stalls: [], defaultStall: "" }
+  }
+}
+
+
 export default function VendorDashboard() {
   const [searchQuery, setSearchQuery] = useState("")
   const [orderData, setOrderData] = useState<ProcessedOrder[]>([])
@@ -84,30 +99,27 @@ export default function VendorDashboard() {
   const [error, setError] = useState<string | null>(null)
   const [selectedHawkerCenter, setSelectedHawkerCenter] = useState("Maxwell Food Center")
   const [stallArray, setStallArray] = useState<string[]>([])
-  const [selectedStall, setSelectedStall] = useState("Chicken Rice Stall")
+  const [selectedStall, setSelectedStall] = useState("")
+  const [stallInitialized, setStallInitialized] = useState(false)
 
   useEffect(() => {
     async function fetchStalls() {
-      try {
-        const stalls = await getStallsForHawkerCenter(selectedHawkerCenter)
-        setStallArray(stalls)
-
-        // Set default stall if not already selected or if it's no longer in list
-        if (stalls.length > 0) {
-          setSelectedStall(stalls[0])
-          console.log(selectedStall) //this logs Chicken Rice Stall
-        } else {
-          setSelectedStall("") // fallback if no stalls
-        }
-
-        console.log("Fetched stalls:", stalls)
-      } catch (err) {
-        console.error("Failed to fetch stalls:", err)
-      }
+      const { stalls, defaultStall } = await populated_stallArray(selectedHawkerCenter)
+      setStallArray(stalls)
+      setSelectedStall(defaultStall)
+      setStallInitialized(true) // ✅ NOW safe to allow fetching
     }
-
+  
     fetchStalls()
+    setStallInitialized(false) // Reset when hawkerCenter changes
   }, [selectedHawkerCenter])
+  
+
+  useEffect(() => {
+    if (stallArray.length > 0 && !selectedStall) {
+      setSelectedStall(stallArray[0])
+    }
+  }, [stallArray, selectedStall])
 
   useEffect(() => {
     console.log("Updated selectedStall:", selectedStall)
@@ -115,12 +127,15 @@ export default function VendorDashboard() {
 
   // Fetch orders from the API
   useEffect(() => {
+    if (!selectedStall || !stallInitialized) return // Wait for stall to be properly initialized
+  
     async function fetchOrders() {
       try {
         setIsLoading(true)
         setError(null)
-
-        // Fetch both pending and completed orders
+  
+        console.log("Fetching orders for:", selectedHawkerCenter, selectedStall)
+  
         const [pendingOrders, completedOrders] = await Promise.all([
           getPendingOrders(selectedHawkerCenter, selectedStall),
           getCompletedOrders(selectedHawkerCenter, selectedStall)
@@ -233,17 +248,18 @@ export default function VendorDashboard() {
 
         setOrderData([...processedPendingOrders, ...processedCompletedOrders])
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch orders')
+        console.error("Order fetch failed:", err)
+        setError(err instanceof Error ? err.message : "Unknown error")
       } finally {
         setIsLoading(false)
       }
     }
-
+  
     fetchOrders()
-    // Set up polling every 30 seconds
-    const interval = setInterval(fetchOrders, 30000)
+    const interval = setInterval(fetchOrders, 10000)
     return () => clearInterval(interval)
-  }, [selectedHawkerCenter, selectedStall])
+  
+  }, [selectedHawkerCenter, selectedStall, stallInitialized])
 
   // Filter orders based on search query
   const filteredOrders = orderData.filter((order) => {
@@ -323,31 +339,33 @@ export default function VendorDashboard() {
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <VendorNavbar />
-        <main className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-center h-64">
-            <p className="text-lg text-muted-foreground">Loading orders...</p>
-          </div>
-        </main>
-      </div>
-    )
-  }
+// Block rendering until both selectedStall is set and not loading
+if (isLoading || !selectedStall) {
+  return (
+    <div className="min-h-screen bg-background">
+      <VendorNavbar />
+      <main className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center h-64">
+          <p className="text-lg text-muted-foreground">Loading orders...</p>
+        </div>
+      </main>
+    </div>
+  )
+}
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-background">
-        <VendorNavbar />
-        <main className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-center h-64">
-            <p className="text-lg text-red-500">Error: {error}</p>
-          </div>
-        </main>
-      </div>
-    )
-  }
+// Only show error *after* loading finished and stall is ready
+if (error && selectedStall) {
+  return (
+    <div className="min-h-screen bg-background">
+      <VendorNavbar />
+      <main className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center h-64">
+          <p className="text-lg text-red-500">Error: {error}</p>
+        </div>
+      </main>
+    </div>
+  )
+}
 
   return (
     <div className="min-h-screen bg-background">
