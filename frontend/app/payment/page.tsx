@@ -50,7 +50,7 @@ export default function PaymentPage() {
   }
 
   const calculateDiscount = () => {
-    return calculateSubtotal() * 0.1 // 10% discount
+    return calculateSubtotal() * 0.05 // 10% discount
   }
 
   const calculateServiceFee = () => {
@@ -176,18 +176,39 @@ export default function PaymentPage() {
 
       if (data.success) {
         toast.success("Payment successful! Redirecting to orders...")
+        // Example in Payment Page after the user pays
+        // const order = {
+        //   id: data.orderId,
+        //   items: orderItems,               // from your cart context
+        //   total: calculateTotal(),
+        //   phoneNumber,
+        //   specialInstructions,
+        //   paymentMethod,
+        //   status: "ready_for_pickup",
+        //   createdAt: new Date().toISOString(),
+        //   userId: "user_zz1",
+        //   hawkerCenter: orderItems[0].hawkerCenterName,
+        // }
+
         const order = {
-          id: data.orderId,
-          items: orderItems,
+          id: "order_" + Date.now(),
+          userId: "user_zz1",
+          hawkerCenter: orderItems[0].hawkerCenterName,
+          items: cart.items.map((item) => ({
+            id: item.id,
+            name: item.name,
+            stallName: item.stallName,
+            quantity: item.quantity,
+            price: item.price,
+            // etc.
+          })),
           total: calculateTotal(),
-          phoneNumber,
-          specialInstructions,
-          paymentMethod,
-          status: "ready_for_pickup",
-          createdAt: new Date().toISOString()
-        }
-        const existingOrders = JSON.parse(localStorage.getItem("orders") || "[]")
-        localStorage.setItem("orders", JSON.stringify([...existingOrders, order]))
+          createdAt: new Date().toISOString(),
+          status: "processing", // or “paid”
+          specialInstructions: "some instructions",
+        };
+        localStorage.setItem("currentOrder", JSON.stringify(order));
+
         clearCart()
         router.push("/orders")
       } else {
