@@ -1,0 +1,54 @@
+_format_version: "3.0"
+_transform: true
+
+services:
+  # =============== CUSTOMER UI ===============
+  - name: ordermgt-public
+    url: http://hawkerflow-ordermgt:5003
+    routes:
+      - name: customer-order-routes
+        paths:
+          - /hawkerCenters
+          - /order
+
+  - name: queuemgt-public
+    url: http://hawkerflow-queuemgt:5000
+    routes:
+      - name: customer-queue-waittime
+        paths:
+          - /waitTime
+
+  # =============== HAWKER UI (Catch-All) ===============
+  - name: queuemgt-protected
+    url: http://hawkerflow-queuemgt:5000
+    routes:
+      - name: hawker-queue-all
+        paths:
+          - /  # catch all routes to this service
+        plugins:
+          - name: key-auth
+          - name: acl
+            config:
+              allow:
+                - hawker-group
+
+  - name: ordermgt-protected
+    url: http://hawkerflow-ordermgt:5003
+    routes:
+      - name: hawker-order-all
+        paths:
+          - /  # catch all to ordermgt, auth protected
+        plugins:
+          - name: key-auth
+          - name: acl
+            config:
+              allow:
+                - hawker-group
+
+consumers:
+  - username: hawker-ui
+    custom_id: hawker-001
+    keyauth_credentials:
+      - key: hawker-api-key-123
+    acls:
+      - group: hawker-group

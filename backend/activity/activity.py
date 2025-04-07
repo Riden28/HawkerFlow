@@ -3,6 +3,7 @@ import json
 import pika
 import threading
 from datetime import datetime
+import time
 from dotenv import load_dotenv
 from flask import Flask, jsonify
 from google.cloud import firestore
@@ -92,16 +93,39 @@ def callback(ch, method, properties, body):
 def run_consumer():
     """
     Runs a RabbitMQ consumer on a separate thread (daemon).
-    Consumes messages from queue "Q_log".
+    Retries connection if RabbitMQ is not ready yet.
     """
     rabbit_host = os.environ.get("RABBITMQ_HOST", "localhost")
-    connection = pika.BlockingConnection(pika.ConnectionParameters(rabbit_host))
+    
+    connection = None
+    for attempt in range(5):
+        try:
+            print(f"Attempt {attempt + 1}: Connecting to RabbitMQ at {rabbit_host}...")
+            connection = pika.BlockingConnection(pika.ConnectionParameters(
+                host=rabbit_host,
+                heartbeat=10000,
+                blocked_connection_timeout=300
+            ))
+            print("Connected to RabbitMQ.")
+            break
+        except pika.exceptions.AMQPConnectionError as e:
+            print(f"RabbitMQ not ready. Retrying in 5 seconds... ({4 - attempt} retries left)")
+            time.sleep(5)
+
+    if connection is None:
+        print("Failed to connect to RabbitMQ after multiple attempts.")
+        return
+
     channel = connection.channel()
     channel.queue_declare(queue="Q_log", durable=True)
     channel.basic_consume(queue="Q_log", on_message_callback=callback, auto_ack=True)
 
     print("activityLog microservice listening on RabbitMQ topic 'Q_log'...")
-    channel.start_consuming()
+    try:
+        channel.start_consuming()
+    except Exception as e:
+        print("Consumer crashed:", e)
+
 
 @app.route('/activity/logs/<string:week_id>', methods=['GET'])
 def get_activity_logs(week_id):

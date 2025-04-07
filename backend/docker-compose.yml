@@ -3,11 +3,18 @@ services:
     image: rabbitmq:3-management
     container_name: rabbitmq
     ports:
-      - "5672:5672"     # AMQP
-      - "15672:15672"   # RabbitMQ UI
+      - "5672:5672"
+      - "15672:15672"
     environment:
-      - RABBITMQ_DEFAULT_USER=guest
-      - RABBITMQ_DEFAULT_PASS=guest
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
 
   setup_rabbitmq:
     build:
@@ -19,11 +26,11 @@ services:
     env_file:
       - .env
     restart: on-failure
-  
+
   queuemgt:
     build:
       context: ./queuemgt
-      dockerfile: queuemanagement.Dockerfile
+      dockerfile: queueManagement.Dockerfile
     container_name: hawkerflow-queuemgt
     ports:
       - "5000:5000"
@@ -32,7 +39,8 @@ services:
     volumes:
       - ./hawkerflow-is213-firebase-adminsdk-fbsvc-5225881c2e.json:/app/firebase-cred.json
     depends_on:
-      - setup_rabbitmq
+      rabbitmq:
+        condition: service_healthy
     environment:
       - RABBITMQ_HOST=rabbitmq
 
@@ -55,11 +63,15 @@ services:
     container_name: hawkerflow-payment
     ports:
       - "5002:5002"
+    env_file:
+      - .env
+    volumes:
+      - ./hawkerflow-is213-firebase-adminsdk-fbsvc-5225881c2e.json:/app/firebase-cred.json
 
   ordermgt:
     build:
       context: ./ordermgt
-      dockerfile: ordermanagement.Dockerfile
+      dockerfile: orderManagement.Dockerfile
     container_name: hawkerflow-ordermgt
     ports:
       - "5003:5003"
@@ -67,10 +79,12 @@ services:
       - setup_rabbitmq
     env_file:
       - .env
-    volumes:
-      - ./hawkerflow-is213-firebase-adminsdk-fbsvc-5225881c2e.json:/app/firebase-cred.json
     environment:
       - RABBITMQ_HOST=rabbitmq
+      - MENU_SERVICE_URL=http://hawkerflow-menu:5001
+      - PAYMENT_SERVICE_URL=http://hawkerflow-payment:5002
+    volumes:
+      - ./hawkerflow-is213-firebase-adminsdk-fbsvc-5225881c2e.json:/app/firebase-cred.json
 
   activity:
     build:
@@ -87,6 +101,31 @@ services:
       - ./hawkerflow-is213-firebase-adminsdk-fbsvc-5225881c2e.json:/app/firebase-cred.json
     environment:
       - RABBITMQ_HOST=rabbitmq
+
+  kong:
+    image: kong/kong-gateway:3.9
+    container_name: kong
+    restart: always
+    networks:
+      - default
+    volumes:
+      - ./kong/kong.yml:/usr/local/kong/declarative/kong.yml
+    environment:
+      KONG_DATABASE: off
+      KONG_DECLARATIVE_CONFIG: /usr/local/kong/declarative/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+      KONG_ADMIN_GUI_URL: http://localhost:8002
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+      - "8002:8002"
+
+volumes:
+  rabbitmq-data:
 
 networks:
   default:

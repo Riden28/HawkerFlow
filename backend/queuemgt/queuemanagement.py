@@ -18,6 +18,7 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 # Retrieve environment variables for credentials and project
 service_account_path = os.environ.get("FIREBASE_SERVICE_ACCOUNT_KEY_PATH")
 project_id = os.environ.get("FIREBASE_PROJECT_ID")
+RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST")
 
 if not service_account_path or not project_id:
     raise ValueError("Required environment variables are not set.")
@@ -28,12 +29,33 @@ cred = service_account.Credentials.from_service_account_file(service_account_pat
 db = firestore.Client(project=project_id, credentials=cred, database='queue')
 
 # RabbitMQ config
-RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST")
-print("RABBITMQ_HOST:", RABBITMQ_HOST)
+# Retry RabbitMQ connection if needed
+connection = None
+channel = None
+
+def setup_rabbitmq_connection():
+    global connection, channel
+    max_retries = 10
+    retry_delay = 3
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            print(f"Attempt {attempt}: Connecting to RabbitMQ at {RABBITMQ_HOST}...")
+            connection = pika.BlockingConnection(pika.ConnectionParameters(host=RABBITMQ_HOST, heartbeat=10000))
+            channel = connection.channel()
+            print("Connected to RabbitMQ")
+            break
+        except pika.exceptions.AMQPConnectionError as e:
+            print(f"Connection failed: {e}")
+            if attempt < max_retries:
+                print("Retrying in 3 seconds...")
+                time.sleep(retry_delay)
+            else:
+                print("Failed to connect to RabbitMQ after multiple attempts.")
+
 EXCHANGE_NAME = 'queue_exchange'
 QUEUE_NAME = 'O_queue'
-connection = pika.BlockingConnection(pika.ConnectionParameters(host=RABBITMQ_HOST, heartbeat=10000))
-channel = connection.channel()
+
 ###############################################################################
 #Web Sockets!!!
 ###############################################################################
