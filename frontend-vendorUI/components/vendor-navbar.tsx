@@ -35,7 +35,7 @@ export function VendorNavbar() {
           <h1 className="text-2xl font-bold flex items-center">
             <Link href="/" className="flex items-center">
               <ChefHat className="h-6 w-6 mr-2" />
-              <span className="text-orange-400">HawkerFlow</span> Vendor
+              <span className="text-yellow-300">HawkerFlow</span> Vendor
             </Link>
           </h1>
 

@@ -34,7 +34,7 @@ export function Navbar() {
     <header className="bg-blue-700 text-primary-foreground py-6 sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center">
-          <h1 className=" text-orange-400 text-2xl font-bold">
+          <h1 className=" text-yellow-300 text-2xl font-bold">
             <Link href="/">HawkerFlow</Link>
           </h1>
 
