@@ -76,7 +76,7 @@ def receiveNotification():
 
 #Callback fucntion to keep listening  for notifications from queue management
 def callbackOrderCompletedNotification(channel, method, properties, body): # required signature for the callback; no return
-    print("\nReceived a Notification by " + __file__)
+    print("\nReceived an order completed Notification by " + __file__)
     processOrderCompletedNotification(body)
     print() # print a new line feed
     
@@ -105,21 +105,23 @@ def processOrderCompletedNotification(body):
 
 #Callback fucntion to keep listening  for notifications from queue management
 def callbackPaymentCompletedNotification(channel, method, properties, body): # required signature for the callback; no return
-    print("\nReceived a Notification by " + __file__)
+    print("\nReceived a payment completed and order success Notification by " + __file__)
     processPaymentCompletedNotification(body)
     print() # print a new line feed
 
 def processPaymentCompletedNotification(body):
     try:
         data = json.loads(body)
-
+        print(data)
         if "paymentStatus" in data:
+            
             payment_status = data["paymentStatus"]
             contact = data.get("phoneNumber")  # Use `.get()` to avoid KeyErrors
 
-            if "completed" in payment_status:
+            if "success" in payment_status:
                 message_body = "Your payment has been received."
                 send_sms(contact, message_body)
+                print("sending sms")
                 return
         
             else:

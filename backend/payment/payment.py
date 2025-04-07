@@ -38,7 +38,7 @@ def payment():
             currency="sgd",
             payment_method=payment_method.id,  # Use the created PaymentMethod ID
             confirm=True, # Confirm the payment immediately
-            automatic_payment_methods={"enabled": True, "allow_redirects": False}
+            automatic_payment_methods={"enabled": True, "allow_redirects": "never"}
         )
         print(payment_intent)
         # Return a success response

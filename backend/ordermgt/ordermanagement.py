@@ -24,7 +24,7 @@ EXCHANGE_NAME = 'order_exchange'  # Exchange name for publishing notifications
 
 # Initialize RabbitMQ connection and channel.
 try:
-    connection = pika.BlockingConnection(pika.ConnectionParameters(host=RABBITMQ_HOST))
+    connection = pika.BlockingConnection(pika.ConnectionParameters(host=RABBITMQ_HOST,heartbeat=10000))
     channel = connection.channel()
     channel.exchange_declare(exchange=EXCHANGE_NAME, exchange_type='topic', durable=True)
     print("RabbitMQ connection established and exchange declared.")
@@ -160,7 +160,7 @@ def create_order():
                 "orderId": order_id,
                 "userId": user_id,
                 "phoneNumber": phone_number,
-                "orderStatus": "completed"
+                "paymentStatus": payment_status
             }
             # Publish to Notification service using routing key "<orderId>.notif"
             publish_message(f"{order_id}.notif", notif_data)
