@@ -109,7 +109,7 @@ docker-compose up --build
 ```
 version: "3"
 agent:
-    authtoken: ___
+    authtoken: your_Ngrok_auth_token
 tunnels:
   activity:
     proto: http
