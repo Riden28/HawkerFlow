@@ -63,7 +63,7 @@ export default function Home() {
       
       socket.on("connect", () => {
         console.log("Connected to the socket server")
-        socket.emit("join_room",  { userId: 'user_Roj_order_001'})
+        socket.emit("join_room",  { userId: 'user_zz1'})
       })
   
       socket.on("order_ready", (data: { message: string }) => {
