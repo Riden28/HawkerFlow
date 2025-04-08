@@ -7,11 +7,11 @@ try:
 except Exception as e:
     print(e)
 
-# --- 1. Call GET /aggregate (if defined as GET, not PATCH) ---
-print("Calling GET /aggregate (current week)")
+# --- 1. Call PATCH /aggregate (if defined as PATCH, not PATCH) ---
+print("Calling PATCH /aggregate (current week)")
 
 try:
-    response = requests.patch(f"{BASE_URL}/aggregate")  # change PATCH to GET
+    response = requests.patch(f"{BASE_URL}/aggregate")  # change PATCH to PATCH
     print("Status Code:", response.status_code)
     print("Response Body:", response.json())
 except Exception as e:
@@ -19,11 +19,11 @@ except Exception as e:
 
 print("\n" + "="*50 + "\n")
 
-# --- 2. Call GET /aggregate/by-week/{weekId} ---
+# --- 2. Call PATCH /aggregate/by-week/{weekId} ---
 week_id = "2025-wk13"
-print(f"Calling GET /aggregate/by-week/{week_id}")
+print(f"Calling PATCH /aggregate/by-week/{week_id}")
 try:
-    response = requests.patch(f"{BASE_URL}/aggregate/by-week/{week_id}")  # use GET
+    response = requests.patch(f"{BASE_URL}/aggregate/by-week/{week_id}")  # use PATCH
     print("Status Code:", response.status_code)
     print("Response Body:", response.json())
 except Exception as e:

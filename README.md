@@ -41,19 +41,24 @@ git clone https://github.com/yourusername/hawkerflow.git
 cd hawkerflow
 ```
 
-2. Install customer frontend dependencies:
+2. Install project depedencies:
+```
+pip install -r requirements.txt
+```
+
+3. Install customer frontend dependencies:
 ```bash
 cd frontend
 pnpm install
 ```
 
-3. Install vendor frontend dependencies:
+4. Install vendor frontend dependencies:
 ```bash
 cd frontend-vendorUI
 pnpm install
 ```
 
-4. Set up environment variables:
+5. Set up environment variables:
 
 For customer frontend, create a `.env.local` file in the frontend directory:
 ```
@@ -78,6 +83,7 @@ TWILIO_PHONE_NUMBER = your_phone_number
 # Backend Services
 RABBITMQ_HOST = rabbitmq
 ```
+
 ## Running the Application
 1. Start the customer frontend:
 ```bash
@@ -97,6 +103,31 @@ cd backend
 docker network create hawker-network
 docker-compose up --build
 ```
+
+4. Set up Outsystems Aggregate Composite Microservice 
+4a. In C:\Users\<user>\AppData\Local\ngrok, update ngrok.yml to:
+```
+version: "3"
+agent:
+    authtoken: 2vCnszwWIgwcxP89zyJM8Sum9Uv_3RiBtAEfVXwE7j8K82QFJ
+tunnels:
+  activity:
+    proto: http
+    addr: 5004
+  menu:
+    proto: http
+    addr: 5001
+```
+4b. In the terminal, run:
+```
+ngrok start --all
+```
+4c. Upload OML file to outsystems.
+
+4d. Change base URL of consumed Activity API to ngrok's exposed local Flask server on the internet connected to port 5004, and Menu API to ngrok's exposed local Flask server on the internet connected to port 5001.
+
+4e. Publish Change to Outsystems.
+
 ## External APIs Used
 - Stripe
     - To generate a token on the front end for Payment ([Link to Documentation](https://docs.stripe.com/js/tokens/create_token?type=cardElement))
