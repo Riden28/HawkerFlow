@@ -416,6 +416,7 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
             notif_data = {
                 "orderId": orderId,
                 "userId": userId,
+                "stallName": hawkerStall,
                 "phoneNumber": updated_order_data.get("phoneNumber"),
                 "orderStatus": "completed"
             }
@@ -493,9 +494,9 @@ def safe_start():
         if channel:
             start_rabbitmq_consumer()
         else:
-            print("❌ Channel not initialized. Skipping consumer startup.")
+            print("Channel not initialized. Skipping consumer startup.")
     except Exception as e:
-        print(f"🔥 RabbitMQ consumer crashed: {e}")
+        print(f"RabbitMQ consumer crashed: {e}")
 
 if __name__ == '__main__':
     threading.Thread(target=safe_start, daemon=True).start()

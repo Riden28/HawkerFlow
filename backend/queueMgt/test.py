@@ -103,3 +103,38 @@ for center_name, stalls in hawker_data.items():
         print(f"  ⏳ Set estimated wait time: {total_wait_time} mins")
 
 print("\n🎉 All hawker centers and stalls seeded successfully in flattened structure!")
+
+def delete_orders_and_reset_wait_time():
+    # Function to recursively delete orders and reset wait times
+    def process_collection(collection_ref):
+        # Stream all documents in the current collection
+        documents = collection_ref.stream()
+        for document in documents:
+            # Attempt to get the 'orders' subcollection
+            orders_subcollection = document.reference.collection('orders')
+            orders = orders_subcollection.stream()
+            has_orders = False
+            
+            # Delete each order in the 'orders' subcollection
+            for order in orders:
+                has_orders = True
+                print(f"Deleting order {order.id} from {document.id} in collection '{collection_ref.id}'")
+                order.reference.delete()
+            
+            # If there were orders, reset the estimatedWaitTime
+            if has_orders:
+                document.reference.update({'estimatedWaitTime': 0})
+                document.reference.update({'totalEarned': 0})
+                print(f"Reset estimatedWaitTime & totalEarned to 0 for {document.id} in collection '{collection_ref.id}'")
+            
+            # Recursively process all subcollections
+            subcollections = document.reference.collections()
+            for subcollection in subcollections:
+                process_collection(subcollection)
+
+    # Retrieve all root-level collections and process each
+    root_collections = db.collections()
+    for root_collection in root_collections:
+        process_collection(root_collection)
+
+delete_orders_and_reset_wait_time()
