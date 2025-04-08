@@ -109,7 +109,7 @@ docker-compose up --build
 ```
 version: "3"
 agent:
-    authtoken: 2vCnszwWIgwcxP89zyJM8Sum9Uv_3RiBtAEfVXwE7j8K82QFJ
+    authtoken: ___
 tunnels:
   activity:
     proto: http
