@@ -19,6 +19,7 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 service_account_path = os.environ.get("FIREBASE_SERVICE_ACCOUNT_KEY_PATH")
 project_id = os.environ.get("FIREBASE_PROJECT_ID")
 RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST")
+print(service_account_path)
 
 if not service_account_path or not project_id:
     raise ValueError("Required environment variables are not set.")
