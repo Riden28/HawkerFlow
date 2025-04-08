@@ -171,7 +171,7 @@ def create_order():
                 "paymentStatus": payment_status,
                 "stalls": stalls_dict  # In a full implementation, detailed dish info could be included.
             }
-            # Publish to Queue Management using routing key "<orderId>.queue"
+            # Publish to Queue Management using routing key "<orderId>.queue
             publish_message(f"{order_id}.queue", order_details)
             
             # Build notification payload for Notification service.
