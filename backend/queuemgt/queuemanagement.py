@@ -19,6 +19,7 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 service_account_path = os.environ.get("FIREBASE_SERVICE_ACCOUNT_KEY_PATH")
 project_id = os.environ.get("FIREBASE_PROJECT_ID")
 RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST")
+print(service_account_path)
 
 if not service_account_path or not project_id:
     raise ValueError("Required environment variables are not set.")
@@ -500,7 +501,7 @@ def safe_start():
 
 if __name__ == '__main__':
     threading.Thread(target=safe_start, daemon=True).start()
-    app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False, allow_unsafe_werkzeug=True)
+    app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
 
 
 
