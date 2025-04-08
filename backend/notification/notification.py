@@ -41,6 +41,7 @@ DS from queuemanagement #scenario 2: notify order completed
 {
     "orderId": int,
     "userId": int,
+    "stallName":"xyzstall"
     "orderStatus": "completed",
     "paymentNumber":"+65xxxxxxxx"
 }
@@ -89,9 +90,9 @@ def processOrderCompletedNotification(body):
         if "orderStatus" in data :
             payment_status = data["orderStatus"]
             contact = data.get("phoneNumber")  # Use `.get()` to avoid KeyErrors
-
+            stallName = data.get("stallName")
             if "completed" in payment_status:
-                message_body = "Your orders have been completed."
+                message_body = f"Your orders from '{stallName}'have been completed."
                 send_sms(contact, message_body)
                 return
             else:
