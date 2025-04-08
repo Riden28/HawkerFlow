@@ -110,8 +110,9 @@ Attached in the project submission will be two .env files which contain our Stri
 .env file should be placed in the following folder in the repo.
 ```
 |-- HawkerFlow
-|  |-- .env
-    #etc
+|  |-- backend
+|  |  |-- .env
+      #etc
 ```
 
 .env.local file should be placed in the following folder in the repo.
