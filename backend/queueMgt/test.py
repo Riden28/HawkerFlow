@@ -137,4 +137,4 @@ def delete_orders_and_reset_wait_time():
     for root_collection in root_collections:
         process_collection(root_collection)
 
-delete_orders_and_reset_wait_time()
+# delete_orders_and_reset_wait_time()

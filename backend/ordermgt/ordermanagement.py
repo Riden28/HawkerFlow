@@ -23,37 +23,56 @@ RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST", "localhost")
 EXCHANGE_NAME = 'order_exchange'  # Exchange name for publishing notifications
 
 # Initialize RabbitMQ connection and channel.
-try:
-    connection = pika.BlockingConnection(pika.ConnectionParameters(host=RABBITMQ_HOST,heartbeat=10000))
-    channel = connection.channel()
-    channel.exchange_declare(exchange=EXCHANGE_NAME, exchange_type='topic', durable=True)
-    print("RabbitMQ connection established and exchange declared.")
-except Exception as e:
-    print(f"Error setting up RabbitMQ: {e}")
-    channel = None
+def setup_rabbitmq_connection():
+    global connection, channel
+    max_retries = 10
+    retry_delay = 3
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            print(f"Attempt {attempt}: Connecting to RabbitMQ at {RABBITMQ_HOST}...")
+            connection = pika.BlockingConnection(pika.ConnectionParameters(host=RABBITMQ_HOST, heartbeat=10000))
+            channel = connection.channel()
+            print("Connected to RabbitMQ")
+            break
+        except pika.exceptions.AMQPConnectionError as e:
+            print(f"Connection failed: {e}")
+            if attempt < max_retries:
+                print("Retrying in 3 seconds...")
+                time.sleep(retry_delay)
+            else:
+                print("Failed to connect to RabbitMQ after multiple attempts.")
+
+def publish_message(routing_key: str, message: dict):
+    try:
+        channel.basic_publish(
+            exchange=EXCHANGE_NAME,
+            routing_key=routing_key,
+            body=json.dumps(message),
+            properties=pika.BasicProperties(delivery_mode=2)
+        )
+        
+        print(f"Published {routing_key}: {message}")
+    except Exception as e:
+        print(f"Failed to publish {routing_key}: {e}")
 
 # In-memory storage for orders (for demonstration purposes)
 orders = {}
 
 # Utility function: Asynchronous Publisher via RabbitMQ
 def publish_message(routing_key: str, message: dict):
-    """
-    Publishes a JSON message to the RabbitMQ exchange using the provided routing key.
-    This message will be delivered asynchronously to the appropriate microservices.
-    """
     try:
-        if channel is None:
-            print("RabbitMQ channel is not available.")
-            return
         channel.basic_publish(
             exchange=EXCHANGE_NAME,
             routing_key=routing_key,
             body=json.dumps(message),
-            properties=pika.BasicProperties(delivery_mode=2)  # persistent message
+            properties=pika.BasicProperties(delivery_mode=2)
         )
-        print(f"Published message with routing key '{routing_key}': {message}")
+        
+        print(f"Published {routing_key}: {message}")
     except Exception as e:
-        print(f"Failed to publish message: {e}")
+        print(f"Failed to publish {routing_key}: {e}")
+
 
 # 1) Composite Endpoints to Retrieve Stall Lists and Menu Items (Proxy Calls)
 ###############################################################################
@@ -198,6 +217,13 @@ def get_order_status(orderId):
         }), 200
     else:
         return jsonify({"error": "Order not found"}), 404
+
+def safe_start():
+    try:
+        setup_rabbitmq_connection()
+    except Exception as e:
+        print(f"RabbitMQ consumer crashed: {e}")
+
 
 # Main - Run the Flask Application
 ###############################################################################
