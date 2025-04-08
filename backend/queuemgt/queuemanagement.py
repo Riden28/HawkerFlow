@@ -430,7 +430,7 @@ def complete_dish(hawkerCenter, hawkerStall, orderId, dishName):
                 'order_ready',
                 {'message': f'Your order is ready for collection from {hawkerStall}!'},
                 namespace='/customer_updates',
-                room=userId
+                room='123'
             )
 
             return jsonify({
