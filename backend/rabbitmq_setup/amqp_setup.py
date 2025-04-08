@@ -5,7 +5,7 @@ amqp_port = 5672
 order_exchange_name = "order_exchange"
 queue_exchange_name = "queue_exchange"
 order_exchange_type = "topic"
-queue_exchange_type = "fanout"
+queue_exchange_type = "topic"
 
 def wait_for_rabbitmq(host, port, retries=10):
     for i in range(retries):
