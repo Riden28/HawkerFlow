@@ -5,6 +5,7 @@ import requests
 import pika
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import threading
 
 # Flask App Initialization
 app = Flask(__name__)
@@ -21,7 +22,8 @@ PAYMENT_SERVICE_URL = os.environ.get("PAYMENT_SERVICE_URL", "http://localhost:50
 # RabbitMQ configuration for asynchronous messaging:
 RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST", "localhost")
 EXCHANGE_NAME = 'order_exchange'  # Exchange name for publishing notifications
-
+connection = None
+channel = None
 # Initialize RabbitMQ connection and channel.
 def setup_rabbitmq_connection():
     global connection, channel
@@ -228,4 +230,5 @@ def safe_start():
 # Main - Run the Flask Application
 ###############################################################################
 if __name__ == '__main__':
+    threading.Thread(target=safe_start, daemon=True).start()
     app.run(host='0.0.0.0', port=5003, debug=False, use_reloader=False)
