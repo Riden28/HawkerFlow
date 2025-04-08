@@ -5,7 +5,6 @@ import requests
 import pika
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import threading
 
 # Flask App Initialization
 app = Flask(__name__)

@@ -4,4 +4,3 @@ pika
 python-dotenv
 flask_cors
 gunicorn
-threading
