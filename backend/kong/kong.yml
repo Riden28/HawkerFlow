@@ -42,20 +42,6 @@ services:
               allow:
                 - hawker-group
 
-  - name: ordermgt-protected
-    url: http://hawkerflow-ordermgt:5003
-    routes:
-      - name: hawker-order-routes
-        paths:
-          - /hawker-only-example  # Placeholder
-        strip_path: false
-        plugins:
-          - name: key-auth
-          - name: acl
-            config:
-              allow:
-                - hawker-group
-
 consumers:
   - username: hawker-ui
     custom_id: hawker-001
