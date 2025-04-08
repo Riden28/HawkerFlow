@@ -32,7 +32,7 @@ def setup_rabbitmq_connection():
     for attempt in range(1, max_retries + 1):
         try:
             print(f"Attempt {attempt}: Connecting to RabbitMQ at {RABBITMQ_HOST}...")
-            connection = pika.BlockingConnection(pika.ConnectionParameters(host=RABBITMQ_HOST, heartbeat=10000))
+            connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost', port=5672))
             channel = connection.channel()
             print("Connected to RabbitMQ")
             break
@@ -162,7 +162,7 @@ def create_order():
         #######################################################################
         # Publish Notifications via RabbitMQ (Asynchronous Messaging)
         #######################################################################
-        if payment_status == "success":
+        # if payment_status == "success":
             # Build order notification payload for Queue Management.
             order_details = {
                 "hawkerCenter": hawker_center,
@@ -229,5 +229,5 @@ def safe_start():
 # Main - Run the Flask Application
 ###############################################################################
 if __name__ == '__main__':
-    threading.Thread(target=safe_start, daemon=True).start()
+    setup_rabbitmq_connection()
     app.run(host='0.0.0.0', port=5003, debug=False, use_reloader=False)
